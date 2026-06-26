@@ -1,0 +1,3 @@
+# zigup
+> zig version manager
+
