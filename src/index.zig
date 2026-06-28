@@ -2,7 +2,7 @@ const std = @import("std");
 const Client = std.http.Client;
 const Allocating = std.Io.Writer.Allocating;
 
-pub const Source = [_][]const u8{
+pub const Mirror = [_][]const u8{
     "https://ziglang.org/download/index.json",
     "https://pkg.hexops.org/zig/index.json",
 };
@@ -40,12 +40,12 @@ pub fn main(init: std.process.Init) !void {
     var ziglang: Allocating = .init(gpa);
     defer ziglang.deinit();
 
-    const index01 = try index.fetch(Source[0], &ziglang);
+    const index01 = try index.fetch(Mirror[0], &ziglang);
     if (index01 == .ok) std.debug.print("{s}", .{ziglang.written()});
 
     var mach: Allocating = .init(gpa);
     defer mach.deinit();
 
-    const index02 = try index.fetch(Source[1], &mach);
+    const index02 = try index.fetch(Mirror[1], &mach);
     if (index02 == .ok) std.debug.print("{s}", .{mach.written()});
 }

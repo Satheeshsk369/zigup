@@ -8,7 +8,7 @@
 
 - GET:`https://ziglang.org/download/index.json` serves as gzip
 - Need to decode from gzip inorder to extract data.
-- Good new: Zig has fetch function which automatically decode the data.
+- Good news: Zig has fetch function which automatically decode the data.
 - The following code fetch smoothly for both ziglang and mach index.
 
 ```zig
@@ -36,11 +36,11 @@ pub fn main(init: std.process.Init) !void {
 }
 ```
 
-## Observe
+## Observation
 - Fetching ziglang index takes 3-4s and mach for 9-10s.
 - so it not suitable for live fetch each time. 
 - decision: store the index json as local file and parse on runtime
-- and `zigup --update` or similar command to upadte the index file.
+- and `zigup --update` or similar command to update the index file.
 
 ## Index URL
 - https://ziglang.org/download/index.json
