@@ -1,4 +1,5 @@
 const std = @import("std");
+const Schema = @import("schema.zig");
 const Client = std.http.Client;
 
 pub const Downloader = struct {
@@ -49,50 +50,28 @@ pub fn main(init: std.process.Init) !void {
         std.log.err("Failed to fetch index: {s}", .{@tagName(index_response.status)});
         return;
     }
-    const Schema = @import("schema.zig").Schema;
-    const VersionDetail = @import("schema.zig").VersionDetail;
-    const parsed = try std.json.parseFromSlice(Schema, gpa, buffer.written(), .{ .ignore_unknown_fields = true });
-    defer parsed.deinit();
 
-    var it = parsed.value.map.iterator();
-    var target_ver: []const u8 = undefined;
-    var found = false;
-    while (it.next()) |entry| {
-        target_ver = entry.key_ptr.*;
-        std.log.info("Found zig version: {s}", .{target_ver});
-        found = true;
-        break;
-    }
-    if (!found) {
-        std.log.err("No versions found in zig index", .{});
+    const schema = try Schema.Type.parse(gpa, buffer.written());
+    defer schema.deinit();
+    const target_ver = "0.16.0";
+    const src = schema.get(target_ver, target_key) orelse {
+        std.log.err("No binary found for version {s} and target: {s}", .{ target_ver, target_key });
         return;
-    }
-    const version_entry = parsed.value.map.get(target_ver).?;
-    inline for (std.meta.fields(VersionDetail)) |f| {
-        if (std.mem.eql(u8, f.name, target_key)) {
-            if (f.type == ?@import("schema.zig").Source) {
-                const field_val = @field(version_entry, f.name);
-                if (field_val) |src| {
-                    std.log.info("Downloading {s} from {s}", .{ target_ver, src.tarball });
+    };
 
-                    var split_it = std.mem.splitBackwardsAny(u8, src.tarball, "/");
-                    const filename = split_it.first();
-                    var dir = std.Io.Dir.cwd();
-                    var file = try dir.createFile(init.io, filename, .{});
-                    defer file.close(init.io);
+    std.log.info("Downloading {s} from {s}", .{ target_ver, src.tarball });
 
-                    const start_ts = std.Io.Clock.now(.awake, init.io);
-                    var dl = Downloader.init(&client);
-                    const dl_status = try dl.downloadToFile(src.tarball, file, init.io);
-                    const end_ts = std.Io.Clock.now(.awake, init.io);
-                    const elapsed_ns = start_ts.durationTo(end_ts).nanoseconds;
-                    std.log.info("Download completed: {s}", .{@tagName(dl_status)});
-                    std.log.info("Time taken: {d:.3}s", .{@as(f64, @floatFromInt(elapsed_ns)) / 1_000_000_000.0});
-                    return;
-                }
-            }
-        }
-    }
+    var split_it = std.mem.splitBackwardsAny(u8, src.tarball, "/");
+    const filename = split_it.first();
+    var dir = std.Io.Dir.cwd();
+    var file = try dir.createFile(init.io, filename, .{});
+    defer file.close(init.io);
 
-    std.log.err("No binary found for target: {s}", .{target_key});
+    const start = std.Io.Clock.now(.awake, init.io);
+    var dl = Downloader.init(&client);
+    const dl_status = try dl.downloadToFile(src.tarball, file, init.io);
+    const stop = std.Io.Clock.now(.awake, init.io);
+    const time = start.durationTo(stop).nanoseconds;
+    std.log.info("Download completed: {s}", .{@tagName(dl_status)});
+    std.log.info("Time taken: {d:.3}s", .{@as(f64, @floatFromInt(time)) / 1_000_000_000.0});
 }

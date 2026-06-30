@@ -43,4 +43,32 @@ pub const VersionDetail = struct {
     @"x86_64-openbsd": ?Source = null,
 };
 
-pub const Schema = std.json.ArrayHashMap(VersionDetail);
+pub const Type = struct {
+    parsed: std.json.Parsed(std.json.ArrayHashMap(VersionDetail)),
+
+    pub fn parse(allocator: std.mem.Allocator, json: []const u8) !Type {
+        const parsed = try std.json.parseFromSlice(
+            std.json.ArrayHashMap(VersionDetail),
+            allocator,
+            json,
+            .{ .ignore_unknown_fields = true },
+        );
+        return Type{ .parsed = parsed };
+    }
+
+    pub fn get(self: Type, version: []const u8, target_key: []const u8) ?Source {
+        const detail = self.parsed.value.map.get(version) orelse return null;
+        inline for (std.meta.fields(VersionDetail)) |f| {
+            if (f.type == ?Source) {
+                if (std.mem.eql(u8, f.name, target_key)) {
+                    return @field(detail, f.name);
+                }
+            }
+        }
+        return null;
+    }
+
+    pub fn deinit(self: Type) void {
+        self.parsed.deinit();
+    }
+};
