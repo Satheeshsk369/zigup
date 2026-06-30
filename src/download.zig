@@ -64,7 +64,7 @@ pub fn main(init: std.process.Init) !void {
         break;
     }
     if (!found) {
-        std.log.err("No versions found in mach index", .{});
+        std.log.err("No versions found in zig index", .{});
         return;
     }
     const version_entry = parsed.value.map.get(target_ver).?;
