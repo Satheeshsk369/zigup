@@ -1,3 +1,5 @@
+const Set = @import("set.zig");
+
 const std = @import("std");
 
 pub const Source = struct {
@@ -6,41 +8,57 @@ pub const Source = struct {
     size: usize,
 };
 
-pub const VersionDetail = struct {
-    version: ?[]const u8 = null,
-    date: [10]u8,
-    docs: ?[]const u8 = null,
-    notes: ?[]const u8 = null,
-    stdDocs: ?[]const u8 = null,
-    src: ?Source = null,
-    bootstrap: ?Source = null,
-    @"x86_64-macos": ?Source = null,
-    @"aarch64-macos": ?Source = null,
-    @"x86_64-linux": ?Source = null,
-    @"aarch64-linux": ?Source = null,
-    @"arm-linux": ?Source = null,
-    @"riscv64-linux": ?Source = null,
-    @"powerpc64le-linux": ?Source = null,
-    @"x86-linux": ?Source = null,
-    @"loongarch64-linux": ?Source = null,
-    @"s390x-linux": ?Source = null,
-    @"x86_64-windows": ?Source = null,
-    @"aarch64-windows": ?Source = null,
-    @"x86-windows": ?Source = null,
-    @"aarch64-freebsd": ?Source = null,
-    @"arm-freebsd": ?Source = null,
-    @"powerpc64le-freebsd": ?Source = null,
-    @"riscv64-freebsd": ?Source = null,
-    @"x86_64-freebsd": ?Source = null,
-    @"aarch64-netbsd": ?Source = null,
-    @"arm-netbsd": ?Source = null,
-    @"riscv64-netbsd": ?Source = null,
-    @"x86-netbsd": ?Source = null,
-    @"x86_64-netbsd": ?Source = null,
-    @"aarch64-openbsd": ?Source = null,
-    @"arm-openbsd": ?Source = null,
-    @"riscv64-openbsd": ?Source = null,
-    @"x86_64-openbsd": ?Source = null,
+pub const Platform = enum {
+    @"x86_64-macos",
+    @"aarch64-macos",
+    @"x86_64-linux",
+    @"aarch64-linux",
+    @"arm-linux",
+    @"riscv64-linux",
+    @"powerpc64le-linux",
+    @"x86-linux",
+    @"loongarch64-linux",
+    @"s390x-linux",
+    @"x86_64-windows",
+    @"aarch64-windows",
+    @"x86-windows",
+    @"aarch64-freebsd",
+    @"arm-freebsd",
+    @"powerpc64le-freebsd",
+    @"riscv64-freebsd",
+    @"x86_64-freebsd",
+    @"aarch64-netbsd",
+    @"arm-netbsd",
+    @"riscv64-netbsd",
+    @"x86-netbsd",
+    @"x86_64-netbsd",
+    @"aarch64-openbsd",
+    @"arm-openbsd",
+    @"riscv64-openbsd",
+    @"x86_64-openbsd",
+
+    const Self = @This();
+
+    pub fn parse(platform: []const u8) ?Platform {
+        return std.meta.stringToEnum(Self, platform);
+    }
+};
+
+pub const VersionDetail = decl: {
+    const Base = struct {
+        version: ?[]const u8 = null,
+        date: [10]u8,
+        docs: ?[]const u8 = null,
+        notes: ?[]const u8 = null,
+        stdDocs: ?[]const u8 = null,
+        src: ?Source = null,
+        bootstrap: ?Source = null,
+    };
+
+    const PlatformUnion = Set.EnumToUnionConst(Platform, ?Source);
+    const PlatformStruct = Set.UnionToStruct(PlatformUnion, .{ .assign_null_for_optional = true });
+
+    break :decl Set.Union(Base, PlatformStruct);
 };
 
 pub const Type = struct {
