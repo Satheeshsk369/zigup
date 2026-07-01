@@ -74,11 +74,12 @@ pub const Type = struct {
         return Type{ .parsed = parsed };
     }
 
-    pub fn get(self: Type, version: []const u8, target_key: []const u8) ?Source {
+    pub fn get(self: Type, version: []const u8, platform: Platform) ?Source {
         const detail = self.parsed.value.map.get(version) orelse return null;
+        const target_name = @tagName(platform);
         inline for (std.meta.fields(VersionDetail)) |f| {
             if (f.type == ?Source) {
-                if (std.mem.eql(u8, f.name, target_key)) {
+                if (std.mem.eql(u8, f.name, target_name)) {
                     return @field(detail, f.name);
                 }
             }

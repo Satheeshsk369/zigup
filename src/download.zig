@@ -53,8 +53,14 @@ pub fn main(init: std.process.Init) !void {
 
     const schema = try Schema.Type.parse(gpa, buffer.written());
     defer schema.deinit();
+
+    const platform = Schema.Platform.parse(target_key) orelse {
+        std.log.err("Unsupported target platform: {s}", .{target_key});
+        return;
+    };
+
     const target_ver = "0.16.0";
-    const src = schema.get(target_ver, target_key) orelse {
+    const src = schema.get(target_ver, platform) orelse {
         std.log.err("No binary found for version {s} and target: {s}", .{ target_ver, target_key });
         return;
     };
