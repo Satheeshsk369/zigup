@@ -84,9 +84,14 @@ pub fn Intersection(comptime A: type, comptime B: type) type {
         var merged: [intersect_size]StructField = undefined;
         var index = 0;
         for (fields_a) |field_a| {
-            if (contains(fields_b, field_a.name)) {
-                merged[index] = field_a;
-                index += 1;
+            for (fields_b) |field_b| {
+                if (std.mem.eql(u8, field_a.name, field_b.name)) {
+                    if (field_a.type != field_b.type) {
+                        @compileError("Field '" ++ field_a.name ++ "' exists in both types but has mismatching types: " ++ @typeName(field_a.type) ++ " vs " ++ @typeName(field_b.type));
+                    }
+                    merged[index] = field_a;
+                    index += 1;
+                }
             }
         }
 
@@ -176,7 +181,7 @@ pub fn EnumToUnion(comptime E: type, comptime T: anytype) type {
         for (info.@"enum".fields, 0..) |f, i| {
             names[i] = f.name;
             types[i] = T[i];
-            attrs[i] = .{ .@"align" = @alignOf(type) };
+            attrs[i] = .{ .@"align" = @alignOf(T[i]) };
         }
 
         return @Union(.auto, E, &names, &types, &attrs);
