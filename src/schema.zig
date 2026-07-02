@@ -43,8 +43,8 @@ pub const Platform = enum {
     }
 
     pub fn toStruct(comptime FieldType: type) type {
-        const PlatformUnion = adt.EnumToUnionConstT(Self, FieldType);
-        return adt.UnionToStruct(PlatformUnion, .{ .assign_null_for_optional = true });
+        const PlatformUnion = adt.Set(null).enumToUnion(Self, FieldType);
+        return adt.Set(null).unionToStruct(PlatformUnion);
     }
 };
 
@@ -59,7 +59,8 @@ pub const VersionDetail = decl: {
         bootstrap: ?Source = null,
     };
     const PlatformStruct = Platform.toStruct(?Source);
-    break :decl adt.Union(Base, PlatformStruct);
+    const System = adt.Set(null);
+    break :decl System.join(Base, PlatformStruct);
 };
 
 pub const Type = struct {
