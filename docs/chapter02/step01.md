@@ -24,3 +24,8 @@
   - **StructToUnion**: `StructToUnion(comptime S: type) type` - Converts a struct type to a tagged union type, tagged by an auto-generated enum.
   - **EnumToUnion**: `EnumToUnion(comptime E: type, comptime T: anytype) type` - Converts an enum type to a tagged union type using the tags of enum `E` and a list of payload types `T`.
   - **UnionToEnum**: `UnionToEnum(comptime U: type) type` - Extracts the underlying enum tag type from a tagged union.
+
+## Moved to seperate libary
+
+- the set.zig file is moved to `https://codeberg.org/Satheeshsk369/adt` to maintain as seperate lib.
+
