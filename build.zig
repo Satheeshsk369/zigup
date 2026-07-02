@@ -4,13 +4,20 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const adt = b.dependency("adt", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     const exe = b.addExecutable(.{
         .name = "zigup",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{},
+            .imports = &.{
+                .{ .name = "adt", .module = adt.module("adt") },
+            },
         }),
     });
     b.installArtifact(exe);

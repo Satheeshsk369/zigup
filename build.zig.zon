@@ -3,7 +3,12 @@
     .version = "0.0.0",
     .fingerprint = 0x7cbb96d030699973,
     .minimum_zig_version = "0.16.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .adt = .{
+            .url = "https://codeberg.org/Satheeshsk369/adt/archive/main.tar.gz",
+            .hash = "adt-0.0.0-vHq1BNUfAAAnKS4Ou8S2xTi2HOTP93KvFq3Vtj3rh6AG",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

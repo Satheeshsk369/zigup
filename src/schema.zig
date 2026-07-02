@@ -1,5 +1,5 @@
 const std = @import("std");
-const Set = @import("set.zig");
+const adt = @import("adt");
 
 pub const Source = struct {
     tarball: []const u8,
@@ -43,8 +43,8 @@ pub const Platform = enum {
     }
 
     pub fn toStruct(comptime FieldType: type) type {
-        const PlatformUnion = Set.EnumToUnionConstT(Self, FieldType);
-        return Set.UnionToStruct(PlatformUnion, .{ .assign_null_for_optional = true });
+        const PlatformUnion = adt.EnumToUnionConstT(Self, FieldType);
+        return adt.UnionToStruct(PlatformUnion, .{ .assign_null_for_optional = true });
     }
 };
 
@@ -59,7 +59,7 @@ pub const VersionDetail = decl: {
         bootstrap: ?Source = null,
     };
     const PlatformStruct = Platform.toStruct(?Source);
-    break :decl Set.Union(Base, PlatformStruct);
+    break :decl adt.Union(Base, PlatformStruct);
 };
 
 pub const Type = struct {
