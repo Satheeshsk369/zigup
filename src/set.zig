@@ -183,11 +183,11 @@ pub fn EnumToUnion(comptime E: type, comptime T: anytype) type {
     }
 }
 
-pub fn EnumToUnionConst(comptime E: type, comptime T: type) type {
+pub fn EnumToUnionConstT(comptime E: type, comptime T: type) type {
     comptime {
         const info = @typeInfo(E);
         if (info != .@"enum") {
-            @compileError("EnumToUnionConst expects an enum type, got: " ++ @typeName(E));
+            @compileError("EnumToUnionConstT expects an enum type, got: " ++ @typeName(E));
         }
 
         var types: [info.@"enum".fields.len]type = undefined;
