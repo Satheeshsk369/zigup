@@ -20,6 +20,7 @@ pub const Downloader = struct {
             .method = .GET,
             .response_writer = &writer.interface,
         });
+        try writer.flush();
         return response.status;
     }
 };
@@ -65,7 +66,7 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    const tarball_url = src.zigTarball orelse src.tarball;
+    const tarball_url = src.tarball;
     std.log.info("Downloading {s} from {s}", .{ target_ver, tarball_url });
 
     var split_it = std.mem.splitBackwardsAny(u8, tarball_url, "/");

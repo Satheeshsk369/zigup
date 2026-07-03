@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "zigup",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
+            .root_source_file = b.path("src/app.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{

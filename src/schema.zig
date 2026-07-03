@@ -1,16 +1,10 @@
 const std = @import("std");
 const adt = @import("adt");
 pub const Set = adt.Set(null);
-pub const Source = decl: {
-    const BaseSource = struct {
-        tarball: []const u8,
-        shasum: []const u8,
-        size: usize,
-    };
-    const MachExtension = struct {
-        zigTarball: ?[]const u8 = null,
-    };
-    break :decl Set.join(BaseSource, MachExtension);
+pub const Source = struct {
+    tarball: []const u8,
+    shasum: []const u8,
+    size: usize,
 };
 
 pub const Platform = enum {
@@ -76,7 +70,7 @@ pub const Type = struct {
             std.json.ArrayHashMap(VersionDetail),
             allocator,
             json,
-            .{ .ignore_unknown_fields = true },
+            .{ .ignore_unknown_fields = true, .allocate = .alloc_always },
         );
         return Type{ .parsed = parsed };
     }
