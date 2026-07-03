@@ -18,18 +18,24 @@ pub fn main(init: std.process.Init) !void {
     var index: IndexMod.Index = .init(gpa, init.io);
     defer index.deinit();
 
-    var buffer: Allocating = .init(gpa);
-    defer buffer.deinit();
+    var ziglang_buf: Allocating = .init(gpa);
+    defer ziglang_buf.deinit();
+    _ = try index.fetch(Mirror[0], &ziglang_buf);
+    const ziglang_schema = try Schema.Type.parse(gpa, ziglang_buf.written());
+    defer ziglang_schema.deinit();
 
-    const ind1 = try index.fetch(Mirror[1], &buffer);
-    const json = buffer.written();
-    if (ind1 == .ok) std.log.info("Status: {s}", .{@tagName(ind1)});
+    var mach_buf: Allocating = .init(gpa);
+    defer mach_buf.deinit();
+    _ = try index.fetch(Mirror[1], &mach_buf);
+    const mach_schema = try Schema.Type.parse(gpa, mach_buf.written());
+    defer mach_schema.deinit();
 
-    const schema = try Schema.Type.parse(gpa, json);
-    defer schema.deinit();
+    var buf: [100][]const u8 = undefined;
+    const unique_versions = Schema.diff(mach_schema, ziglang_schema, &buf);
 
-    var it = schema.parsed.value.map.iterator();
-    while (it.next()) |entry| {
-        std.debug.print("Version: {s}, Date: {s}\n", .{ entry.key_ptr.*, entry.value_ptr.date });
+    for (unique_versions) |version| {
+        std.debug.print(" - {s}\n", .{version});
     }
+    std.debug.print("Total unique versions: {d}\n", .{unique_versions.len});
+    std.debug.print("----------------------------------------\n\n", .{});
 }

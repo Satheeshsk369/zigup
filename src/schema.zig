@@ -1,10 +1,16 @@
 const std = @import("std");
 const adt = @import("adt");
-
-pub const Source = struct {
-    tarball: []const u8,
-    shasum: []const u8,
-    size: usize,
+pub const Set = adt.Set(null);
+pub const Source = decl: {
+    const BaseSource = struct {
+        tarball: []const u8,
+        shasum: []const u8,
+        size: usize,
+    };
+    const MachExtension = struct {
+        zigTarball: ?[]const u8 = null,
+    };
+    break :decl Set.join(BaseSource, MachExtension);
 };
 
 pub const Platform = enum {
@@ -43,8 +49,8 @@ pub const Platform = enum {
     }
 
     pub fn toStruct(comptime FieldType: type) type {
-        const PlatformUnion = adt.Set(null).enumToUnion(Self, FieldType);
-        return adt.Set(null).unionToStruct(PlatformUnion);
+        const PlatformUnion = Set.enumToUnion(Self, FieldType);
+        return Set.unionToStruct(PlatformUnion);
     }
 };
 
@@ -59,8 +65,7 @@ pub const VersionDetail = decl: {
         bootstrap: ?Source = null,
     };
     const PlatformStruct = Platform.toStruct(?Source);
-    const System = adt.Set(null);
-    break :decl System.join(Base, PlatformStruct);
+    break :decl Set.join(Base, PlatformStruct);
 };
 
 pub const Type = struct {
@@ -80,8 +85,8 @@ pub const Type = struct {
         const detail = self.parsed.value.map.get(version) orelse return null;
         const target_name = @tagName(platform);
         inline for (std.meta.fields(VersionDetail)) |f| {
-            if (f.type == ?Source) {
-                if (std.mem.eql(u8, f.name, target_name)) {
+            if (std.mem.eql(u8, f.name, target_name)) {
+                if (f.type == ?Source) {
                     return @field(detail, f.name);
                 }
             }
@@ -93,3 +98,18 @@ pub const Type = struct {
         self.parsed.deinit();
     }
 };
+
+pub fn diff(target: Type, source: Type, out_buffer: [][]const u8) []const []const u8 {
+    var count: usize = 0;
+    var it = target.parsed.value.map.iterator();
+    while (it.next()) |entry| {
+        const key = entry.key_ptr.*;
+        if (!source.parsed.value.map.contains(key)) {
+            if (count < out_buffer.len) {
+                out_buffer[count] = key;
+                count += 1;
+            }
+        }
+    }
+    return out_buffer[0..count];
+}

@@ -65,9 +65,10 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    std.log.info("Downloading {s} from {s}", .{ target_ver, src.tarball });
+    const tarball_url = src.zigTarball orelse src.tarball;
+    std.log.info("Downloading {s} from {s}", .{ target_ver, tarball_url });
 
-    var split_it = std.mem.splitBackwardsAny(u8, src.tarball, "/");
+    var split_it = std.mem.splitBackwardsAny(u8, tarball_url, "/");
     const filename = split_it.first();
     var dir = std.Io.Dir.cwd();
     var file = try dir.createFile(init.io, filename, .{});
@@ -75,7 +76,7 @@ pub fn main(init: std.process.Init) !void {
 
     const start = std.Io.Clock.now(.awake, init.io);
     var dl = Downloader.init(&client);
-    const dl_status = try dl.downloadToFile(src.tarball, file, init.io);
+    const dl_status = try dl.downloadToFile(tarball_url, file, init.io);
     const stop = std.Io.Clock.now(.awake, init.io);
     const time = start.durationTo(stop).nanoseconds;
     std.log.info("Download completed: {s}", .{@tagName(dl_status)});
