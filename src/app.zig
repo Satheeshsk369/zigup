@@ -189,29 +189,26 @@ pub fn main(init: std.process.Init) !void {
             repl.log("fetching {s}...", .{target_ver});
             std.debug.print("\n", .{});
 
-            var dir = std.Io.Dir.cwd();
-            var file = try dir.createFile(io, filename, .{});
-            defer file.close(io);
 
             var prog = Progress.init(use_color);
             var dl = Downloader.init(&index.client);
-            const start_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
-            const dl_status = try dl.downloadToFile(src.tarball, file, io, &prog);
-            if (dl_status != .ok) {
-                repl.log("http error: {s}", .{@tagName(dl_status)});
-            }
-            const stop_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
-            const duration_s = @as(f64, @floatFromInt(stop_ns -| start_ns)) / 1_000_000_000.0;
-
-            const final: Status = if (dl_status == .ok) .downloaded else .missing;
+            const dir = std.Io.Dir.cwd();
+            var file = try dir.createFile(io, filename, .{});
+            defer file.close(io);
+            var dl_future = io.async(Downloader.downloadToFile, .{ &dl, src.tarball, file, io, &prog });
+            defer _ = dl_future.cancel(io) catch {};
+            const result: Downloader.Result = try dl_future.await(io);
+            
+            const final: Status = if (result.status == .ok) .downloaded else .missing;
             state.set(selected_idx, final);
             tbl.patch(selected_idx, final.toString(use_color));
             repl.log("{s} {s} in {d:.3}s", .{
                 target_ver,
-                if (dl_status == .ok) "done" else "failed",
-                duration_s,
+                if (result.status == .ok) "done" else "failed",
+                @as(f64, @floatFromInt(result.duration)) / 1_000_000_000.0,
             });
             std.debug.print("\n> ", .{});
+
         } else if (std.mem.eql(u8, cmd, "delete")) {
             cwd.deleteFile(io, filename) catch |err| {
                 repl.log("error: {s}", .{@errorName(err)});

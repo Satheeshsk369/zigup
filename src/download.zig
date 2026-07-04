@@ -5,6 +5,11 @@ const Progress = @import("ui/progress.zig").Progress;
 pub const Downloader = struct {
     client: *Client,
 
+    pub const Result = struct {
+        status: std.http.Status,
+        duration: i128,
+    };
+
     pub fn init(client: *Client) Downloader {
         return .{ .client = client };
     }
@@ -15,7 +20,8 @@ pub const Downloader = struct {
         file: std.Io.File,
         io: std.Io,
         progress: *Progress,
-    ) !std.http.Status {
+    ) !Result {
+        const start = std.Io.Clock.now(.awake, io).nanoseconds;
         const uri = try std.Uri.parse(url);
 
         var req = try self.client.request(.GET, uri, .{});
@@ -44,23 +50,25 @@ pub const Downloader = struct {
 
         var chunk_buf: [8192]u8 = undefined;
         var downloaded: u64 = 0;
-        const start_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
 
         progress.begin();
 
         while (true) {
             var chunk_writer = std.Io.Writer.fixed(&chunk_buf);
-            const n = body.stream(&chunk_writer, std.Io.Limit.limited(chunk_buf.len)) catch break;
-            if (n == 0) break;
+            const n = body.stream(&chunk_writer, std.Io.Limit.limited(chunk_buf.len)) catch |err| switch (err) {
+                error.EndOfStream => break,
+                else => |e| return e,
+            };
             try writer.interface.writeAll(chunk_buf[0..n]);
             downloaded += n;
             const now_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
-            progress.update(downloaded, total_size, now_ns -| start_ns);
+            progress.update(downloaded, total_size, now_ns -| @as(u64, @intCast(start)));
         }
 
         try writer.flush();
         progress.end();
 
-        return response.head.status;
+        const stop = std.Io.Clock.now(.awake, io).nanoseconds;
+        return .{ .status = response.head.status, .duration = stop - start };
     }
 };
