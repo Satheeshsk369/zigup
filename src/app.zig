@@ -125,52 +125,59 @@ pub fn main(init: std.process.Init) !void {
     }
 
     const col_widths = try Table.printMeasured(gpa, io, TableItem, table_items.items);
-    std.debug.print("\n", .{});
 
     const tbl = TableBuffer.init(col_widths, table_items.items.len);
-    var repl = ReplBuffer.init();
+    const repl = ReplBuffer.init();
 
     var stdin_buf: [128]u8 = undefined;
     var stdin_reader = std.Io.File.stdin().reader(io, &stdin_buf);
     var stdin_iface = &stdin_reader.interface;
 
+    repl.log("{s}", .{Help.print(use_color)});
+    std.debug.print("\n> ", .{});
+
     while (true) {
-        std.debug.print("> ", .{});
         const line = (try stdin_iface.takeDelimiter('\n')) orelse break;
         const trimmed = std.mem.trim(u8, line, " \r\n");
 
         if (std.mem.eql(u8, trimmed, "q")) break;
 
-        if (std.mem.eql(u8, trimmed, "help")) {
-            Help.print(use_color);
+        if (std.mem.eql(u8, trimmed, "help") or trimmed.len == 0) {
+            repl.log("{s}", .{Help.print(use_color)});
+            std.debug.print("\n> ", .{});
             continue;
         }
 
         const sp = std.mem.indexOfScalar(u8, trimmed, ' ');
         if (sp == null) {
-            Help.print(use_color);
+            repl.log("unknown: {s}  |  {s}", .{ trimmed, Help.print(use_color) });
+            std.debug.print("\n> ", .{});
             continue;
         }
 
         const cmd = trimmed[0..sp.?];
         const num_str = std.mem.trim(u8, trimmed[sp.? + 1 ..], " ");
         const selected_idx = std.fmt.parseInt(usize, num_str, 10) catch {
-            repl.log("usage: {s} <index>\n", .{cmd});
+            repl.log("usage: {s} <index>", .{cmd});
+            std.debug.print("\n> ", .{});
             continue;
         };
 
         if (selected_idx >= versions.items.len) {
-            repl.log("index out of range (0-{d})\n", .{versions.items.len - 1});
+            repl.log("index out of range (0-{d})", .{versions.items.len - 1});
+            std.debug.print("\n> ", .{});
             continue;
         }
 
         const target_ver = versions.items[selected_idx].key;
         const platform = Schema.Platform.parse(getTargetKey()) orelse {
-            repl.log("error: unsupported platform: {s}\n", .{getTargetKey()});
+            repl.log("error: unsupported platform: {s}", .{getTargetKey()});
+            std.debug.print("\n> ", .{});
             return;
         };
         const src = schema.get(target_ver, platform) orelse {
-            repl.log("error: no binary for {s} on {s}\n", .{ target_ver, getTargetKey() });
+            repl.log("error: no binary for {s} on {s}", .{ target_ver, getTargetKey() });
+            std.debug.print("\n> ", .{});
             continue;
         };
         var split_it = std.mem.splitBackwardsAny(u8, src.tarball, "/");
@@ -179,7 +186,8 @@ pub fn main(init: std.process.Init) !void {
         if (std.mem.eql(u8, cmd, "fetch")) {
             state.set(selected_idx, .fetching);
             tbl.patch(selected_idx, Status.fetching.toString(use_color));
-            repl.log("fetching {s} from {s}{s}{s}\n", .{ target_ver, c_url, src.tarball, c_rst });
+            repl.log("fetching {s}...", .{target_ver});
+            std.debug.print("\n", .{});
 
             var dir = std.Io.Dir.cwd();
             var file = try dir.createFile(io, filename, .{});
@@ -187,28 +195,36 @@ pub fn main(init: std.process.Init) !void {
 
             var prog = Progress.init(use_color);
             var dl = Downloader.init(&index.client);
-            const start_time = std.Io.Clock.now(.awake, io);
+            const start_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
             const dl_status = try dl.downloadToFile(src.tarball, file, io, &prog);
-            const stop_time = std.Io.Clock.now(.awake, io);
-            const duration_s = @as(f64, @floatFromInt(start_time.durationTo(stop_time).nanoseconds)) / 1_000_000_000.0;
+            if (dl_status != .ok) {
+                repl.log("http error: {s}", .{@tagName(dl_status)});
+            }
+            const stop_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
+            const duration_s = @as(f64, @floatFromInt(stop_ns -| start_ns)) / 1_000_000_000.0;
 
             const final: Status = if (dl_status == .ok) .downloaded else .missing;
             state.set(selected_idx, final);
             tbl.patch(selected_idx, final.toString(use_color));
-            repl.log("{s} in {d:.3}s\n", .{
+            repl.log("{s} {s} in {d:.3}s", .{
+                target_ver,
                 if (dl_status == .ok) "done" else "failed",
                 duration_s,
             });
+            std.debug.print("\n> ", .{});
         } else if (std.mem.eql(u8, cmd, "delete")) {
             cwd.deleteFile(io, filename) catch |err| {
-                repl.log("error: {s}\n", .{@errorName(err)});
+                repl.log("error: {s}", .{@errorName(err)});
+                std.debug.print("\n> ", .{});
                 continue;
             };
             state.set(selected_idx, .missing);
             tbl.patch(selected_idx, Status.missing.toString(use_color));
-            repl.log("deleted {s}\n", .{filename});
+            repl.log("deleted {s}", .{filename});
+            std.debug.print("\n> ", .{});
         } else {
-            Help.print(use_color);
+            repl.log("unknown: {s}  |  {s}", .{ cmd, Help.print(use_color) });
+            std.debug.print("\n> ", .{});
         }
     }
 }

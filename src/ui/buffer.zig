@@ -1,7 +1,5 @@
 const std = @import("std");
 
-pub const REPL_HEIGHT: usize = 5;
-
 fn visibleLen(s: []const u8) usize {
     var len: usize = 0;
     var i: usize = 0;
@@ -29,9 +27,7 @@ pub const TableBuffer = struct {
 
     pub fn init(col_widths: [4]usize, n_rows: usize) TableBuffer {
         var col: usize = vert_width;
-        for (0..3) |ci| {
-            col += padding_left + col_widths[ci] + padding_right + vert_width;
-        }
+        for (0..3) |ci| col += padding_left + col_widths[ci] + padding_right + vert_width;
         col += vert_width + padding_left;
         return .{
             .status_col = col,
@@ -42,57 +38,33 @@ pub const TableBuffer = struct {
 
     pub fn patch(self: TableBuffer, row_idx: usize, status_str: []const u8) void {
         if (row_idx >= self.n_rows) return;
-
-        // From the bottom of the repl region, the table bottom border is
-        // REPL_HEIGHT + 1 lines up (1 blank + REPL_HEIGHT repl lines).
-        // Data rows above that: bot_border=1, then row n-1 at offset 2, row i at offset (n-i+1).
-        // Total from repl bottom: REPL_HEIGHT + 1 + (n_rows - row_idx + 1)
-        const lines_up = REPL_HEIGHT + 1 + self.n_rows - row_idx + 1;
-
         const vis = visibleLen(status_str);
         const total_spaces = if (self.status_width >= vis) self.status_width - vis else 0;
         const left_pad = total_spaces / 2;
         const right_pad = total_spaces - left_pad;
-
         std.debug.print("\x1b[s", .{});
-        std.debug.print("\x1b[{d}A", .{lines_up});
+        std.debug.print("\x1b[{d}A", .{self.n_rows - row_idx + 3});
         std.debug.print("\x1b[{d}G", .{self.status_col});
-
         var i: usize = 0;
         while (i < self.status_width + padding_right) : (i += 1) std.debug.print(" ", .{});
-
         std.debug.print("\x1b[{d}G", .{self.status_col});
         var j: usize = 0;
         while (j < left_pad) : (j += 1) std.debug.print(" ", .{});
         std.debug.print("{s}", .{status_str});
         var k: usize = 0;
         while (k < right_pad) : (k += 1) std.debug.print(" ", .{});
-
         std.debug.print("\x1b[u", .{});
     }
 };
 
 pub const ReplBuffer = struct {
-    line_idx: usize,
-
     pub fn init() ReplBuffer {
-        var i: usize = 0;
-        while (i < REPL_HEIGHT) : (i += 1) std.debug.print("\n", .{});
-        return .{ .line_idx = 0 };
+        std.debug.print("\n", .{});
+        return .{};
     }
-
-    pub fn log(self: *ReplBuffer, comptime fmt: []const u8, args: anytype) void {
-        const used = self.line_idx % REPL_HEIGHT;
-        // lines_up from current cursor (at prompt line, just after repl region):
-        // repl region is REPL_HEIGHT lines up; line 0 is at top, line used is:
-        const lines_up = REPL_HEIGHT - used;
-
-        std.debug.print("\x1b[s", .{});
-        std.debug.print("\x1b[{d}A", .{lines_up});
+    pub fn log(self: ReplBuffer, comptime fmt: []const u8, args: anytype) void {
+        _ = self;
         std.debug.print("\x1b[1G\x1b[2K", .{});
         std.debug.print(fmt, args);
-        std.debug.print("\x1b[u", .{});
-
-        self.line_idx += 1;
     }
 };

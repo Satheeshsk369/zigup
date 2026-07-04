@@ -1,5 +1,4 @@
 const std = @import("std");
-const Schema = @import("schema.zig");
 const Client = std.http.Client;
 const Progress = @import("ui/progress.zig").Progress;
 
@@ -19,15 +18,26 @@ pub const Downloader = struct {
     ) !std.http.Status {
         const uri = try std.Uri.parse(url);
 
-        var redirect_buf: [4096]u8 = undefined;
         var req = try self.client.request(.GET, uri, .{});
+        defer req.deinit();
         try req.sendBodiless();
+
+        var redirect_buf: [8192]u8 = undefined;
         var response = try req.receiveHead(&redirect_buf);
 
         const total_size = response.head.content_length;
 
-        var transfer_buf: [65536]u8 = undefined;
-        const body = response.reader(&transfer_buf);
+        var transfer_buf: [64]u8 = undefined;
+        var decompress: std.http.Decompress = undefined;
+        const decompress_buf: []u8 = switch (response.head.content_encoding) {
+            .identity => &.{},
+            .deflate, .gzip => try self.client.allocator.alloc(u8, std.compress.flate.max_window_len),
+            .zstd => try self.client.allocator.alloc(u8, std.compress.zstd.default_window_len),
+            .compress => return error.UnsupportedCompressionMethod,
+        };
+        defer self.client.allocator.free(decompress_buf);
+
+        const body = response.readerDecompressing(&transfer_buf, &decompress, decompress_buf);
 
         var file_buf: [65536]u8 = undefined;
         var writer = file.writer(io, &file_buf);
