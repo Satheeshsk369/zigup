@@ -17,32 +17,26 @@ pub fn main(init: std.process.Init) !void {
     const io = init.io;
 
     var use_mach = false;
-    var it_args = try std.process.Args.Iterator.initAllocator(init.minimal.args, gpa);
-    defer it_args.deinit();
-    while (it_args.next()) |arg| {
+    const arena = init.arena.allocator();
+    const args = try init.minimal.args.toSlice(arena);
+    for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--mach")) {
             use_mach = true;
         }
     }
 
-    var client: Client = .{ .allocator = gpa, .io = io };
-    defer client.deinit();
+    var index = Index.init(gpa, io);
+    defer index.deinit();
 
     var buffer = std.Io.Writer.Allocating.init(gpa);
     defer buffer.deinit();
 
     const mirror_url = if (use_mach) Mirror[1] else Mirror[0];
-    std.log.info("Fetching index from {s}...", .{mirror_url});
+    std.log.info("Fetching index from {s}", .{mirror_url});
 
-    const uri = try std.Uri.parse(mirror_url);
-    const index_response = try client.fetch(.{
-        .location = .{ .uri = uri },
-        .method = .GET,
-        .response_writer = &buffer.writer,
-    });
-
-    if (index_response.status != .ok) {
-        std.log.err("Failed to fetch index: {s}", .{@tagName(index_response.status)});
+    const index_response = try index.fetch(mirror_url, &buffer);
+    if (index_response != .ok) {
+        std.log.err("Failed to fetch index: {s}", .{@tagName(index_response)});
         return;
     }
 
@@ -56,29 +50,22 @@ pub fn main(init: std.process.Init) !void {
 
     var versions = std.ArrayList(VersionItem).empty;
     defer versions.deinit(gpa);
-    var it = schema.parsed.value.map.iterator();
     if (use_mach) {
         var official_buf = std.Io.Writer.Allocating.init(gpa);
         defer official_buf.deinit();
-        const official_uri = try std.Uri.parse(Mirror[0]);
-        const official_response = try client.fetch(.{
-            .location = .{ .uri = official_uri },
-            .method = .GET,
-            .response_writer = &official_buf.writer,
-        });
-        if (official_response.status == .ok) {
+        if ((try index.fetch(Mirror[0], &official_buf)) == .ok) {
             const official_schema = try Schema.Type.parse(gpa, official_buf.written());
             defer official_schema.deinit();
 
             var buf_keys: [200][]const u8 = undefined;
-            const diff_keys = Schema.diff(schema, official_schema, &buf_keys);
-            for (diff_keys) |key| {
+            for (Schema.diff(schema, official_schema, &buf_keys)) |key| {
                 if (schema.parsed.value.map.get(key)) |detail| {
                     try versions.append(gpa, .{ .key = key, .date = &detail.date });
                 }
             }
         }
     } else {
+        var it = schema.parsed.value.map.iterator();
         while (it.next()) |entry| {
             try versions.append(gpa, .{ .key = entry.key_ptr.*, .date = &entry.value_ptr.date });
         }
@@ -136,7 +123,7 @@ pub fn main(init: std.process.Init) !void {
             };
 
             const tarball_url = src.tarball;
-            std.log.info("Downloading {s} from {s}...", .{ target_ver, tarball_url });
+            std.log.info("Downloading {s} from {s}", .{ target_ver, tarball_url });
 
             var split_it = std.mem.splitBackwardsAny(u8, tarball_url, "/");
             const filename = split_it.first();
@@ -145,7 +132,7 @@ pub fn main(init: std.process.Init) !void {
             defer file.close(io);
 
             const start_time = std.Io.Clock.now(.awake, io);
-            var dl = Downloader.init(&client);
+            var dl = Downloader.init(&index.client);
             const dl_status = try dl.downloadToFile(tarball_url, file, io);
             const stop_time = std.Io.Clock.now(.awake, io);
             const duration = start_time.durationTo(stop_time).nanoseconds;
