@@ -8,6 +8,8 @@ pub const Progress = struct {
         return .{ .use_color = use_color, .active = false };
     }
 
+    /// Call after printing the status message (no trailing newline needed there).
+    /// Moves to a fresh bar line below the message and leaves the cursor there.
     pub fn begin(self: *Progress) void {
         self.active = true;
         std.debug.print("\n", .{});
@@ -28,7 +30,9 @@ pub const Progress = struct {
         else
             0.0;
 
-        std.debug.print("\x1b[1A\x1b[2K", .{});
+        // Overwrite the bar line in place: go to col 1, erase line, redraw.
+        // No cursor-up — the cursor is already on the bar line.
+        std.debug.print("\x1b[1G\x1b[2K", .{});
 
         if (total) |t| {
             const pct: usize = if (t > 0) @intCast(@min(100, downloaded * 100 / t)) else 0;
@@ -42,7 +46,7 @@ pub const Progress = struct {
                 i += 1;
             }
             while (i < bar_width) : (i += 1) std.debug.print(" ", .{});
-            std.debug.print("]{s} {s}{d:>3}%{s}  {s}{s}/s{s}\n", .{
+            std.debug.print("]{s} {s}{d:>3}%{s}  {s}{s}/s{s}", .{
                 c_rst, c_pct, pct, c_rst, c_spd, fmtSize(speed), c_rst,
             });
         } else {
@@ -52,15 +56,17 @@ pub const Progress = struct {
             const spin = "=-";
             const frame: usize = (downloaded / 4096) % spin.len;
             while (i < bar_width) : (i += 1) std.debug.print("{c}", .{spin[if (i == bar_width / 2) frame else 0]});
-            std.debug.print("]{s}  {s}{d} KB{s}  {s}{s}/s{s}\n", .{
+            std.debug.print("]{s}  {s}{d} KB{s}  {s}{s}/s{s}", .{
                 c_rst, c_pct, kb, c_rst, c_spd, fmtSize(speed), c_rst,
             });
         }
     }
 
+    /// Erase the bar line and move cursor back up to the message line.
+    /// After this, repl.log can overwrite the message line cleanly.
     pub fn end(self: *Progress) void {
         if (!self.active) return;
-        std.debug.print("\x1b[1A\x1b[2K", .{});
+        std.debug.print("\x1b[1G\x1b[2K\x1b[1A", .{});
         self.active = false;
     }
 };

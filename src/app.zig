@@ -187,9 +187,6 @@ pub fn main(init: std.process.Init) !void {
             state.set(selected_idx, .fetching);
             tbl.patch(selected_idx, Status.fetching.toString(use_color));
             repl.log("fetching {s}...", .{target_ver});
-            std.debug.print("\n", .{});
-
-
             var prog = Progress.init(use_color);
             var dl = Downloader.init(&index.client);
             const dir = std.Io.Dir.cwd();
