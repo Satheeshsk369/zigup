@@ -125,20 +125,15 @@ pub fn main(init: std.process.Init) !void {
             const tarball_url = src.tarball;
             std.log.info("Downloading {s} from {s}", .{ target_ver, tarball_url });
 
-            var split_it = std.mem.splitBackwardsAny(u8, tarball_url, "/");
-            const filename = split_it.first();
-            var dir = std.Io.Dir.cwd();
-            var file = try dir.createFile(io, filename, .{});
-            defer file.close(io);
-
-            const start_time = std.Io.Clock.now(.awake, io);
             var dl = Downloader.init(&index.client);
-            const dl_status = try dl.downloadToFile(tarball_url, file, io);
-            const stop_time = std.Io.Clock.now(.awake, io);
-            const duration = start_time.durationTo(stop_time).nanoseconds;
+            const dir = std.Io.Dir.cwd();
+            var dl_future = io.async(Downloader.downloadToFile, .{ &dl, io, tarball_url, dir });
+            defer _ = dl_future.cancel(io) catch {};
+            const result: Downloader.Result = try dl_future.await(io);
 
-            std.log.info("Download status: {s}", .{@tagName(dl_status)});
-            std.log.info("Time elapsed: {d:.3}s", .{@as(f64, @floatFromInt(duration)) / 1_000_000_000.0});
+            std.log.info("Download status: {s}", .{@tagName(result.status)});
+            std.log.info("Time elapsed: {d:.3}s", .{@as(f64, @floatFromInt(result.duration)) / 1_000_000_000.0});
+
             break;
         }
     }

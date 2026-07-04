@@ -11,7 +11,19 @@ pub const Downloader = struct {
         return Self{ .client = client };
     }
 
-    pub fn downloadToFile(self: *Self, url: []const u8, file: std.Io.File, io: std.Io) !std.http.Status {
+    pub const Result = struct {
+        status: std.http.Status,
+        duration: i128,
+    };
+
+    pub fn downloadToFile(self: *Self, io: std.Io, url: []const u8, dir: std.Io.Dir) !Result {
+        const start = std.Io.Clock.now(.awake, io).nanoseconds;
+
+        var split_it = std.mem.splitBackwardsAny(u8, url, "/");
+        const filename = split_it.first();
+        var file = try dir.createFile(io, filename, .{});
+        defer file.close(io);
+
         const uri = try std.Uri.parse(url);
         var buf: [65536]u8 = undefined;
         var writer = file.writer(io, &buf);
@@ -21,13 +33,14 @@ pub const Downloader = struct {
             .response_writer = &writer.interface,
         });
         try writer.flush();
-        return response.status;
+
+        const stop = std.Io.Clock.now(.awake, io).nanoseconds;
+        return .{ .status = response.status, .duration = stop - start };
     }
 };
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
-
     const builtin = @import("builtin");
     const arch = @tagName(builtin.target.cpu.arch);
     const os = @tagName(builtin.target.os.tag);
@@ -69,17 +82,11 @@ pub fn main(init: std.process.Init) !void {
     const tarball_url = src.tarball;
     std.log.info("Downloading {s} from {s}", .{ target_ver, tarball_url });
 
-    var split_it = std.mem.splitBackwardsAny(u8, tarball_url, "/");
-    const filename = split_it.first();
-    var dir = std.Io.Dir.cwd();
-    var file = try dir.createFile(init.io, filename, .{});
-    defer file.close(init.io);
-
-    const start = std.Io.Clock.now(.awake, init.io);
+    const dir = std.Io.Dir.cwd();
     var dl = Downloader.init(&client);
-    const dl_status = try dl.downloadToFile(tarball_url, file, init.io);
-    const stop = std.Io.Clock.now(.awake, init.io);
-    const time = start.durationTo(stop).nanoseconds;
-    std.log.info("Download completed: {s}", .{@tagName(dl_status)});
-    std.log.info("Time taken: {d:.3}s", .{@as(f64, @floatFromInt(time)) / 1_000_000_000.0});
+    var dl_future = init.io.async(Downloader.downloadToFile, .{ &dl, init.io, tarball_url, dir });
+    defer _ = dl_future.cancel(init.io) catch {};
+    const result = try dl_future.await(init.io);
+    std.log.info("Download completed: {s}", .{@tagName(result.status)});
+    std.log.info("Time taken: {d:.3}s", .{@as(f64, @floatFromInt(result.duration)) / 1_000_000_000.0});
 }
