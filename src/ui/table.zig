@@ -1,5 +1,6 @@
 const std = @import("std");
 const color = @import("color.zig");
+const out = @import("out.zig");
 
 fn visibleLen(s: []const u8) usize {
     var len: usize = 0;
@@ -169,16 +170,16 @@ pub fn printConfig(allocator: std.mem.Allocator, io: std.Io, comptime T: type, s
 
     const printLine = struct {
         fn run(widths: []const usize, cfg: Config, left: []const u8, mid: []const u8, right: []const u8, horiz: []const u8, color_prefix: []const u8) void {
-            std.debug.print("{s}{s}", .{ color_prefix, left });
+            out.print("{s}{s}", .{ color_prefix, left });
             for (widths, 0..) |w, col_idx| {
                 var i: usize = 0;
                 while (i < w + cfg.padding_left + cfg.padding_right) : (i += 1) {
-                    std.debug.print("{s}", .{horiz});
+                    out.print("{s}", .{horiz});
                 }
                 if (col_idx < widths.len - 1) {
-                    std.debug.print("{s}", .{mid});
+                    out.print("{s}", .{mid});
                 } else {
-                    std.debug.print("{s}\n", .{right});
+                    out.print("{s}\n", .{right});
                 }
             }
         }
@@ -188,30 +189,30 @@ pub fn printConfig(allocator: std.mem.Allocator, io: std.Io, comptime T: type, s
         fn run(n: usize) void {
             var i: usize = 0;
             while (i < n) : (i += 1) {
-                std.debug.print(" ", .{});
+                out.print(" ", .{});
             }
         }
     }.run;
 
     printLine(&col_widths, config, b.top_left, b.top_mid, b.top_right, b.horiz, c_border);
 
-    std.debug.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
+    out.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
     inline for (fields, 0..) |field, col_idx| {
         const w = col_widths[col_idx];
         const total_spaces = w - field.name.len;
         const left_spaces = total_spaces / 2;
         const right_spaces = total_spaces - left_spaces;
         printSpaces(config.padding_left + left_spaces);
-        std.debug.print("{s}{s}{s}", .{ c_header, field.name, c_reset });
+        out.print("{s}{s}{s}", .{ c_header, field.name, c_reset });
         printSpaces(config.padding_right + right_spaces);
-        std.debug.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
+        out.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
     }
-    std.debug.print("\n", .{});
+    out.print("\n", .{});
 
     printLine(&col_widths, config, b.mid_left, b.mid_mid, b.mid_right, b.horiz, c_border);
 
     for (slice) |row| {
-        std.debug.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
+        out.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
         inline for (fields, 0..) |field, col_idx| {
             const w = col_widths[col_idx];
             const val = @field(row, field.name);
@@ -233,27 +234,27 @@ pub fn printConfig(allocator: std.mem.Allocator, io: std.Io, comptime T: type, s
             switch (alignment) {
                 .left => {
                     printSpaces(config.padding_left);
-                    std.debug.print("{s}{s}{s}", .{ current_color, str, c_reset });
+                    out.print("{s}{s}{s}", .{ current_color, str, c_reset });
                     printSpaces(total_spaces + config.padding_right);
                 },
                 .right => {
                     printSpaces(config.padding_left + total_spaces);
-                    std.debug.print("{s}{s}{s}", .{ current_color, str, c_reset });
+                    out.print("{s}{s}{s}", .{ current_color, str, c_reset });
                     printSpaces(config.padding_right);
                 },
                 .center => {
                     const left_spaces = total_spaces / 2;
                     const right_spaces = total_spaces - left_spaces;
                     printSpaces(config.padding_left + left_spaces);
-                    std.debug.print("{s}{s}{s}", .{ current_color, str, c_reset });
+                    out.print("{s}{s}{s}", .{ current_color, str, c_reset });
                     printSpaces(config.padding_right + right_spaces);
                 },
             }
-            std.debug.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
+            out.print("{s}{s}{s}", .{ c_border, b.vert, c_reset });
         }
-        std.debug.print("\n", .{});
+        out.print("\n", .{});
     }
 
     printLine(&col_widths, config, b.bot_left, b.bot_mid, b.bot_right, b.horiz, c_border);
-    std.debug.print("{s}", .{c_reset});
+    out.print("{s}", .{c_reset});
 }

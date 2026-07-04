@@ -1,4 +1,5 @@
 const std = @import("std");
+const out = @import("out.zig");
 
 fn visibleLen(s: []const u8) usize {
     var len: usize = 0;
@@ -42,29 +43,31 @@ pub const TableBuffer = struct {
         const total_spaces = if (self.status_width >= vis) self.status_width - vis else 0;
         const left_pad = total_spaces / 2;
         const right_pad = total_spaces - left_pad;
-        std.debug.print("\x1b[s", .{});
-        std.debug.print("\x1b[{d}A", .{self.n_rows - row_idx + 3});
-        std.debug.print("\x1b[{d}G", .{self.status_col});
+        out.print("\x1b[s", .{});
+        out.print("\x1b[{d}A", .{self.n_rows - row_idx + 3});
+        out.print("\x1b[{d}G", .{self.status_col});
         var i: usize = 0;
-        while (i < self.status_width + padding_right) : (i += 1) std.debug.print(" ", .{});
-        std.debug.print("\x1b[{d}G", .{self.status_col});
+        while (i < self.status_width + padding_right) : (i += 1) out.print(" ", .{});
+        out.print("\x1b[{d}G", .{self.status_col});
         var j: usize = 0;
-        while (j < left_pad) : (j += 1) std.debug.print(" ", .{});
-        std.debug.print("{s}", .{status_str});
+        while (j < left_pad) : (j += 1) out.print(" ", .{});
+        out.print("{s}", .{status_str});
         var k: usize = 0;
-        while (k < right_pad) : (k += 1) std.debug.print(" ", .{});
-        std.debug.print("\x1b[u", .{});
+        while (k < right_pad) : (k += 1) out.print(" ", .{});
+        out.print("\x1b[u", .{});
+        out.flush();
     }
 };
 
 pub const ReplBuffer = struct {
     pub fn init() ReplBuffer {
-        std.debug.print("\n", .{});
+        out.print("\n", .{});
+        out.flush();
         return .{};
     }
     pub fn log(self: ReplBuffer, comptime fmt: []const u8, args: anytype) void {
         _ = self;
-        std.debug.print("\x1b[1G\x1b[2K", .{});
-        std.debug.print(fmt, args);
+        out.print("\x1b[1G\x1b[2K", .{});
+        out.print(fmt, args);
     }
 };
