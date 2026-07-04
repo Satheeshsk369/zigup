@@ -1,85 +1,56 @@
 const std = @import("std");
 const Schema = @import("schema.zig");
 const Client = std.http.Client;
+const Progress = @import("ui/progress.zig").Progress;
 
 pub const Downloader = struct {
     client: *Client,
 
-    const Self = @This();
-
-    pub fn init(client: *Client) Self {
-        return Self{ .client = client };
+    pub fn init(client: *Client) Downloader {
+        return .{ .client = client };
     }
 
-    pub fn downloadToFile(self: *Self, url: []const u8, file: std.Io.File, io: std.Io) !std.http.Status {
+    pub fn downloadToFile(
+        self: *Downloader,
+        url: []const u8,
+        file: std.Io.File,
+        io: std.Io,
+        progress: *Progress,
+    ) !std.http.Status {
         const uri = try std.Uri.parse(url);
-        var buf: [65536]u8 = undefined;
-        var writer = file.writer(io, &buf);
-        const response = try self.client.fetch(.{
-            .location = .{ .uri = uri },
-            .method = .GET,
-            .response_writer = &writer.interface,
-        });
+
+        var redirect_buf: [4096]u8 = undefined;
+        var req = try self.client.request(.GET, uri, .{});
+        try req.sendBodiless();
+        var response = try req.receiveHead(&redirect_buf);
+
+        const total_size = response.head.content_length;
+
+        var transfer_buf: [65536]u8 = undefined;
+        const body = response.reader(&transfer_buf);
+
+        var file_buf: [65536]u8 = undefined;
+        var writer = file.writer(io, &file_buf);
+
+        var chunk_buf: [8192]u8 = undefined;
+        var downloaded: u64 = 0;
+        const start_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
+
+        progress.begin();
+
+        while (true) {
+            var chunk_writer = std.Io.Writer.fixed(&chunk_buf);
+            const n = body.stream(&chunk_writer, std.Io.Limit.limited(chunk_buf.len)) catch break;
+            if (n == 0) break;
+            try writer.interface.writeAll(chunk_buf[0..n]);
+            downloaded += n;
+            const now_ns: u64 = @intCast(@max(0, std.Io.Clock.now(.awake, io).nanoseconds));
+            progress.update(downloaded, total_size, now_ns -| start_ns);
+        }
+
         try writer.flush();
-        return response.status;
+        progress.end();
+
+        return response.head.status;
     }
 };
-
-pub fn main(init: std.process.Init) !void {
-    const gpa = init.gpa;
-
-    const builtin = @import("builtin");
-    const arch = @tagName(builtin.target.cpu.arch);
-    const os = @tagName(builtin.target.os.tag);
-    const target_key = arch ++ "-" ++ os;
-
-    var client: Client = .{ .allocator = gpa, .io = init.io };
-    defer client.deinit();
-
-    var buffer = std.Io.Writer.Allocating.init(gpa);
-    defer buffer.deinit();
-
-    std.log.info("Fetching zig index...", .{});
-    const uri = try std.Uri.parse("https://ziglang.org/download/index.json");
-    const index_response = try client.fetch(.{
-        .location = .{ .uri = uri },
-        .method = .GET,
-        .response_writer = &buffer.writer,
-    });
-
-    if (index_response.status != .ok) {
-        std.log.err("Failed to fetch index: {s}", .{@tagName(index_response.status)});
-        return;
-    }
-
-    const schema = try Schema.Type.parse(gpa, buffer.written());
-    defer schema.deinit();
-
-    const platform = Schema.Platform.parse(target_key) orelse {
-        std.log.err("Unsupported target platform: {s}", .{target_key});
-        return;
-    };
-
-    const target_ver = "0.16.0";
-    const src = schema.get(target_ver, platform) orelse {
-        std.log.err("No binary found for version {s} and target: {s}", .{ target_ver, target_key });
-        return;
-    };
-
-    const tarball_url = src.tarball;
-    std.log.info("Downloading {s} from {s}", .{ target_ver, tarball_url });
-
-    var split_it = std.mem.splitBackwardsAny(u8, tarball_url, "/");
-    const filename = split_it.first();
-    var dir = std.Io.Dir.cwd();
-    var file = try dir.createFile(init.io, filename, .{});
-    defer file.close(init.io);
-
-    const start = std.Io.Clock.now(.awake, init.io);
-    var dl = Downloader.init(&client);
-    const dl_status = try dl.downloadToFile(tarball_url, file, init.io);
-    const stop = std.Io.Clock.now(.awake, init.io);
-    const time = start.durationTo(stop).nanoseconds;
-    std.log.info("Download completed: {s}", .{@tagName(dl_status)});
-    std.log.info("Time taken: {d:.3}s", .{@as(f64, @floatFromInt(time)) / 1_000_000_000.0});
-}
