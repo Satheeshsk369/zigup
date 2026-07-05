@@ -53,11 +53,11 @@ pub fn main(init: std.process.Init) !void {
     } else if (std.mem.eql(u8, command_str, "list")) {
         if (cloud_target) |ct| {
             command = switch (ct) {
-                .ziglang => .list_ziglang,
-                .mach => .list_mach,
+                .ziglang => .show_ziglang,
+                .mach => .show_mach,
             };
         } else {
-            command = .list_local;
+            command = .list;
         }
     } else if (std.mem.eql(u8, command_str, "install")) {
         if (args.len < 3) {
@@ -70,21 +70,14 @@ pub fn main(init: std.process.Init) !void {
                 .mach => Command{ .install_mach = args[2] },
             };
         } else {
-            command = Command{ .install_local = args[2] };
+            command = Command{ .default_ziglang = args[2] }; // local install = set default
         }
     } else if (std.mem.eql(u8, command_str, "delete")) {
         if (args.len < 3) {
             std.debug.print("error: delete requires a tag version\n", .{});
             return;
         }
-        if (cloud_target) |ct| {
-            command = switch (ct) {
-                .ziglang => Command{ .delete_ziglang = args[2] },
-                .mach => Command{ .delete_mach = args[2] },
-            };
-        } else {
-            command = Command{ .delete_local = args[2] };
-        }
+        command = if (cloud_target == .mach) Command{ .delete_mach = args[2] } else Command{ .delete_ziglang = args[2] };
     }
 
     if (command == null) {
@@ -116,7 +109,7 @@ pub fn main(init: std.process.Init) !void {
                 std.debug.print("env status: ~/.zigup/bin is NOT in your PATH. Please add it to configure environment.\n", .{});
             }
         },
-        .list_local => {
+        .list => {
             const home_path = try getHomePath(init, arena);
             const zigup_dir_path = try std.fs.path.join(arena, &.{ home_path, ".zigup" });
 
@@ -139,8 +132,8 @@ pub fn main(init: std.process.Init) !void {
                 std.debug.print("No installed versions found in ~/.zigup/\n", .{});
             }
         },
-        .list_ziglang, .list_mach => {
-            const is_mach_target = (command.? == .list_mach);
+        .show_ziglang, .show_mach => {
+            const is_mach_target = (command.? == .show_mach);
             var index = Schema.Index.init(gpa, io);
             defer index.deinit();
 
@@ -194,9 +187,8 @@ pub fn main(init: std.process.Init) !void {
                 std.debug.print(" - {s} ({s})\n", .{ item.key, item.date });
             }
         },
-        .install_local => {
-            // Local install = set default symlink
-            const target_ver = command.?.install_local;
+        .default_ziglang, .default_mach => {
+            const target_ver = if (command.? == .default_mach) command.?.default_mach else command.?.default_ziglang;
 
             const home_path = try getHomePath(init, gpa);
             defer gpa.free(home_path);
@@ -205,6 +197,8 @@ pub fn main(init: std.process.Init) !void {
             defer gpa.free(zigup_dir_path);
 
             const target_install_dir = try std.fs.path.join(gpa, &.{ zigup_dir_path, target_ver });
+            defer gpa.free(target_install_dir);
+
             const file_exists = if (std.Io.Dir.openDirAbsolute(io, target_install_dir, .{})) |*d| blk: {
                 d.close(io);
                 break :blk true;
@@ -354,10 +348,9 @@ pub fn main(init: std.process.Init) !void {
 
             std.debug.print("Successfully installed version {s}.\n", .{target_ver});
         },
-        .delete_local, .delete_ziglang, .delete_mach => {
+        .delete_ziglang, .delete_mach => {
             const is_mach_target = (command.? == .delete_mach);
-            const is_ziglang_target = (command.? == .delete_ziglang);
-            const target_ver = if (is_mach_target) command.?.delete_mach else if (is_ziglang_target) command.?.delete_ziglang else command.?.delete_local;
+            const target_ver = if (is_mach_target) command.?.delete_mach else command.?.delete_ziglang;
 
             const home_path = try getHomePath(init, gpa);
             defer gpa.free(home_path);

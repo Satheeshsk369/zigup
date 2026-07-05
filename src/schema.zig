@@ -82,24 +82,24 @@ pub const Platform = enum {
         return std.meta.stringToEnum(Self, platform);
     }
 
-    pub fn toStruct(comptime FieldType: type) type {
-        const PlatformUnion = Set.enumToUnion(Self, FieldType);
-        return Set.unionToStruct(PlatformUnion);
+    pub fn toUnion(comptime FieldType: type) type {
+        return Set.enumToUnion(Self, FieldType);
     }
 };
 
 pub const VersionDetail = decl: {
-    const Base = struct {
-        version: ?[]const u8 = null,
+    const BaseEnum = enum { version, date, docs, notes, stdDocs, src, bootstrap };
+    const BaseUnion = union(BaseEnum) {
+        version: ?[]const u8,
         date: [10]u8,
-        docs: ?[]const u8 = null,
-        notes: ?[]const u8 = null,
-        stdDocs: ?[]const u8 = null,
-        src: ?Source = null,
-        bootstrap: ?Source = null,
+        docs: ?[]const u8,
+        notes: ?[]const u8,
+        stdDocs: ?[]const u8,
+        src: ?Source,
+        bootstrap: ?Source,
     };
-    const PlatformStruct = Platform.toStruct(?Source);
-    break :decl Set.join(Base, PlatformStruct);
+    const PlatformUnion = Platform.toUnion(?Source);
+    break :decl Set.unionToStruct(Set.join(BaseUnion, PlatformUnion));
 };
 
 pub const Type = struct {

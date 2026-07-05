@@ -3,61 +3,16 @@ const adt = @import("adt");
 
 pub const Set = adt.Set(null);
 
-pub const TypeA = enum {
-    help,
-    version,
-    env,
-};
+pub const NoArgOptions = enum(u2) { help, version, env, list };
+pub const Mirror = enum(u1) { ziglang, mach };
+pub const OpArg1 = enum(u2) { install, delete, default };
+pub const OpNoArg = enum(u1) { show };
 
-pub const TypeB = enum {
-    install,
-    list,
-    delete,
-};
+pub const OpArg1Indexed = Set.cartesianProduct(OpArg1, Mirror, .{ .separator = "_" });
+pub const OpNoArgIndexed = Set.cartesianProduct(OpNoArg, Mirror, .{ .separator = "_" });
 
-pub const TypeC = enum {
-    ziglang,
-    mach,
-    local,
-};
+pub const VoidType = Set.enumToUnion(NoArgOptions, void);
+pub const OpArg1Type = Set.enumToUnion(OpArg1Indexed, []const u8);
+pub const OpNoArgType = Set.enumToUnion(OpNoArgIndexed, void);
 
-// Type D => Cartesian product of B and C (struct type containing combinations as fields)
-pub const TypeD = Set.cartesianProduct(TypeB, TypeC);
-
-// Transform Type A enum to union then to struct
-pub const TypeAStruct = Set.unionToStruct(Set.enumToUnion(TypeA, void));
-
-// Joint representation of A and D (struct type)
-pub const AppStateLayout = Set.join(TypeAStruct, TypeD);
-
-// UniverseEnum (Type E) is the enum generated from the keys of AppStateLayout
-pub const UniverseEnum = enum {
-    help,
-    version,
-    env,
-    install_ziglang,
-    install_mach,
-    install_local,
-    list_ziglang,
-    list_mach,
-    list_local,
-    delete_ziglang,
-    delete_mach,
-    delete_local,
-};
-
-pub const Command = union(UniverseEnum) {
-    help: void,
-    version: void,
-    env: void,
-
-    install_ziglang: []const u8,
-    install_mach: []const u8,
-    install_local: []const u8,
-    list_ziglang: void,
-    list_mach: void,
-    list_local: void,
-    delete_ziglang: []const u8,
-    delete_mach: []const u8,
-    delete_local: []const u8,
-};
+pub const Command = Set.join(Set.join(VoidType, OpArg1Type), OpNoArgType);
