@@ -1,6 +1,46 @@
 const std = @import("std");
 const adt = @import("adt");
-pub const Set = adt.Set(null);
+
+const Client = std.http.Client;
+const Allocating = std.Io.Writer.Allocating;
+const Set = adt.Set(null);
+
+pub const Index = struct {
+    client: Client,
+
+    const Self = @This();
+
+    pub const Mirror = enum(u1) {
+        ziglang,
+        mach,
+
+        pub fn url(index: Mirror) []const u8 {
+            return switch (index) {
+                .ziglang => "https://ziglang.org/download/index.json",
+                .mach => "https://pkg.hexops.org/zig/index.json",
+            };
+        }
+    };
+
+    pub fn init(gpa: std.mem.Allocator, io: std.Io) Self {
+        return Self{ .client = .{ .allocator = gpa, .io = io } };
+    }
+
+    pub fn fetch(self: *Self, index: Mirror, body: *Allocating) !std.http.Status {
+        const uri = try std.Uri.parse(index.url());
+        const response = try self.client.fetch(.{
+            .location = .{ .uri = uri },
+            .method = .GET,
+            .response_writer = &body.writer,
+        });
+        return response.status;
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.client.deinit();
+    }
+};
+
 pub const Source = struct {
     tarball: []const u8,
     shasum: []const u8,

@@ -1,10 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const IndexMod = @import("index.zig");
 const Allocating = std.Io.Writer.Allocating;
 
 const Schema = @import("schema.zig");
-const Mirror = IndexMod.Mirror;
 
 fn getTarget() []const u8 {
     const arch = @tagName(builtin.target.cpu.arch);
@@ -15,18 +13,18 @@ fn getTarget() []const u8 {
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
 
-    var index: IndexMod.Index = .init(gpa, init.io);
+    var index: Schema.Index = .init(gpa, init.io);
     defer index.deinit();
 
     var ziglang_buf: Allocating = .init(gpa);
     defer ziglang_buf.deinit();
-    _ = try index.fetch(Mirror[0], &ziglang_buf);
+    _ = try index.fetch(.ziglang, &ziglang_buf);
     const ziglang_schema = try Schema.Type.parse(gpa, ziglang_buf.written());
     defer ziglang_schema.deinit();
 
     var mach_buf: Allocating = .init(gpa);
     defer mach_buf.deinit();
-    _ = try index.fetch(Mirror[1], &mach_buf);
+    _ = try index.fetch(.mach, &mach_buf);
     const mach_schema = try Schema.Type.parse(gpa, mach_buf.written());
     defer mach_schema.deinit();
 

@@ -1,8 +1,6 @@
 const std = @import("std");
 const Schema = @import("schema.zig");
 const Downloader = @import("download.zig").Downloader;
-const Index = @import("index.zig").Index;
-const Mirror = @import("index.zig").Mirror;
 const StateMod = @import("state.zig");
 const Status = StateMod.Status;
 
@@ -32,7 +30,7 @@ pub fn main(init: std.process.Init) !void {
 
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
-    
+
     if (args.len >= 2 and std.mem.eql(u8, args[1], "init")) {
         is_init = true;
         if (args.len >= 3) {
@@ -136,16 +134,16 @@ pub fn main(init: std.process.Init) !void {
         }
         return;
     }
-    var index = Index.init(gpa, io);
+    var index = Schema.Index.init(gpa, io);
     defer index.deinit();
 
     var http_buf = std.Io.Writer.Allocating.init(gpa);
     defer http_buf.deinit();
 
-    const mirror_url = if (use_mach) Mirror[1] else Mirror[0];
-    std.debug.print("Fetching {s}...\n", .{mirror_url});
+    const mirror: Schema.Index.Mirror = if (use_mach) .mach else .ziglang;
+    std.debug.print("Fetching {s}...\n", .{mirror.url()});
 
-    const index_response = try index.fetch(mirror_url, &http_buf);
+    const index_response = try index.fetch(mirror, &http_buf);
     if (index_response != .ok) {
         std.debug.print("Failed to fetch index: {s}\n", .{@tagName(index_response)});
         return;
@@ -165,7 +163,7 @@ pub fn main(init: std.process.Init) !void {
     if (use_mach) {
         var official_buf = std.Io.Writer.Allocating.init(gpa);
         defer official_buf.deinit();
-        if ((try index.fetch(Mirror[0], &official_buf)) == .ok) {
+        if ((try index.fetch(.ziglang, &official_buf)) == .ok) {
             const official_schema = try Schema.Type.parse(gpa, official_buf.written());
             defer official_schema.deinit();
             var buf_keys: [200][]const u8 = undefined;
@@ -382,7 +380,7 @@ pub fn main(init: std.process.Init) !void {
             std.Io.Dir.createDirAbsolute(io, target_install_dir, .default_dir) catch {};
 
             std.debug.print("\nExtracting tarball...\n", .{});
-            
+
             // Execute extraction
             var child = std.process.spawn(io, .{
                 .argv = &.{ "tar", "-xf", tar_filepath, "-C", target_install_dir, "--strip-components=1" },
