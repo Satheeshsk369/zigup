@@ -1,6 +1,12 @@
 const std = @import("std");
 const Client = std.http.Client;
-const Status = @import("state.zig").Status;
+pub const Status = enum {
+    missing,
+    fetching,
+    corrupted,
+    downloaded,
+    default,
+};
 
 pub const Downloader = struct {
     client: *Client,
@@ -62,7 +68,7 @@ pub const Downloader = struct {
             try writer.interface.writeAll(chunk_buf[0..n]);
             downloaded += n;
             _ = std.Io.Clock.now(.awake, io).nanoseconds;
-        // no update progress
+            // no update progress
         }
 
         try writer.flush();
