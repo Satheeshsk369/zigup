@@ -3,25 +3,27 @@ const std = @import("std");
 pub const Status = enum {
     missing,
     fetching,
+    corrupted,
     downloaded,
     default,
+    pub fn toString(self: Status) []const u8 {
+        return switch (self) {
+            .missing => "missing",
+            .fetching => "fetching",
+            .corrupted => "corrupted",
+            .downloaded => "downloaded",
+            .default => "default",
+        };
+    }
 
-    pub fn toString(self: Status, use_color: bool) []const u8 {
-        if (use_color) {
-            return switch (self) {
-                .missing => "\x1b[90m-\x1b[0m",
-                .fetching => "\x1b[34mfetching..\x1b[0m",
-                .downloaded => "\x1b[31mdownloaded\x1b[0m",
-                .default => "\x1b[32mdefault\x1b[0m",
-            };
-        } else {
-            return switch (self) {
-                .missing => "-",
-                .fetching => "fetching..",
-                .downloaded => "downloaded",
-                .default => "default",
-            };
-        }
+    pub fn toColorString(self: Status) []const u8 {
+        return switch (self) {
+            .missing => "\x1b[37mmissing\x1b[0m",
+            .fetching => "fetching",
+            .corrupted => "\x1b[31mcorrupted\x1b[0m",
+            .downloaded => "\x1b[34mdownloaded\x1b[0m",
+            .default => "\x1b[32mdefault\x1b[0m",
+        };
     }
 };
 
