@@ -316,8 +316,7 @@ pub fn main(init: std.process.Init) !void {
             var file = try std.Io.Dir.createFileAbsolute(io, filename, .{});
             defer file.close(io);
 
-            var prog = download_mod.Status.fetching;
-            const result = try download_mod.Downloader.downloadToFile(&dl, src.tarball, file, io, &prog);
+            const result = try download_mod.Downloader.downloadToFile(&dl, src.tarball, file, io);
 
             if (result.status != .ok) {
                 std.debug.print("error: failed to download tarball. HTTP {s}\n", .{@tagName(result.status)});

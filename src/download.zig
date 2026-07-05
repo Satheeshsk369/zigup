@@ -1,12 +1,5 @@
 const std = @import("std");
 const Client = std.http.Client;
-pub const Status = enum {
-    missing,
-    fetching,
-    corrupted,
-    downloaded,
-    default,
-};
 
 pub const Downloader = struct {
     client: *Client,
@@ -25,7 +18,6 @@ pub const Downloader = struct {
         url: []const u8,
         file: std.Io.File,
         io: std.Io,
-        status_out: *Status,
     ) !Result {
         const start = std.Io.Clock.now(.awake, io).nanoseconds;
         const uri = try std.Uri.parse(url);
@@ -56,8 +48,6 @@ pub const Downloader = struct {
 
         var chunk_buf: [8192]u8 = undefined;
         var downloaded: u64 = 0;
-
-        status_out.* = .fetching;
 
         while (true) {
             var chunk_writer = std.Io.Writer.fixed(&chunk_buf);
