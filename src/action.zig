@@ -81,17 +81,26 @@ pub fn parseCommand(args: []const []const u8) ?Command {
     }
 
     if (std.mem.eql(u8, cmd, "install")) {
-        if (args.len < 3) return null;
+        if (args.len < 3) {
+            std.log.err("command 'install' requires a version tag", .{});
+            return .help;
+        }
         return Command{ .install = args[2] };
     }
 
     if (std.mem.eql(u8, cmd, "default")) {
-        if (args.len < 3) return null;
+        if (args.len < 3) {
+            std.log.err("command 'default' requires a version tag", .{});
+            return .help;
+        }
         return Command{ .default = args[2] };
     }
 
     if (std.mem.eql(u8, cmd, "delete")) {
-        if (args.len < 3) return null;
+        if (args.len < 3) {
+            std.log.err("command 'delete' requires a version tag", .{});
+            return .help;
+        }
         return Command{ .delete = args[2] };
     }
 
@@ -121,15 +130,15 @@ fn runHelp() void {
 fn runEnv(ctx: Context) !void {
     const needle = try ctx.binDir();
     if (std.mem.indexOf(u8, ctx.pathEnv, needle) != null) {
-        std.debug.print("env status: ~/.zigup/bin is in your PATH\n", .{});
+        std.log.info("~/.zigup/bin is in your PATH", .{});
     } else {
-        std.debug.print("env status: ~/.zigup/bin is NOT in your PATH. Please add it.\n", .{});
+        std.log.warn("~/.zigup/bin is NOT in your PATH. Please add it.", .{});
     }
 }
 
 fn syncMirror(ctx: Context, mirror: []const u8) !void {
     const url = ctx.userConfig.getMirrorUrl(mirror) orelse {
-        std.debug.print("error: mirror '{s}' not defined in config.zon\n", .{mirror});
+        std.log.err("mirror '{s}' not defined in config.zon", .{mirror});
         return;
     };
 
@@ -139,9 +148,9 @@ fn syncMirror(ctx: Context, mirror: []const u8) !void {
     var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
     defer httpBuf.deinit();
 
-    std.debug.print("Syncing index from {s} ({s})...\n", .{ mirror, url });
+    std.log.info("Syncing index from {s} ({s})...", .{ mirror, url });
     if ((try index.fetchUrl(url, &httpBuf)) != .ok) {
-        std.debug.print("error: failed to fetch index\n", .{});
+        std.log.err("failed to fetch index", .{});
         return;
     }
 
@@ -158,7 +167,7 @@ fn runList(ctx: Context, mirror_arg: []const u8) !void {
 
         const cache_path = try ctx.cacheFile(m);
         const schema = Schema.Type.loadCache(ctx.gpa, ctx.io, cache_path) catch |err| {
-            std.debug.print("error: failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup list {s} -S') to sync the cache.\n", .{ m, @errorName(err), m });
+            std.log.err("failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup list {s} -S') to sync the cache.", .{ m, @errorName(err), m });
             return;
         };
         defer schema.deinit();
@@ -186,7 +195,7 @@ fn runList(ctx: Context, mirror_arg: []const u8) !void {
     } else {
         const zigup_dir_path = try ctx.zigupDir();
         var dir = std.Io.Dir.openDirAbsolute(ctx.io, zigup_dir_path, .{ .iterate = true }) catch |err| {
-            std.debug.print("No installed versions found (~/.zigup does not exist): {s}\n", .{@errorName(err)});
+            std.log.warn("No installed versions found (~/.zigup does not exist): {s}", .{@errorName(err)});
             return;
         };
         defer dir.close(ctx.io);
@@ -204,7 +213,7 @@ fn runList(ctx: Context, mirror_arg: []const u8) !void {
             }
         }
 
-        if (count == 0) std.debug.print("No installed versions found in ~/.zigup/\n", .{});
+        if (count == 0) std.log.info("No installed versions found in ~/.zigup/", .{});
     }
 }
 
@@ -221,7 +230,7 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     }
 
     if (mirror_opt != null and url_opt != null) {
-        std.debug.print("error: cannot specify both --mirror and --url\n", .{});
+        std.log.err("cannot specify both --mirror and --url", .{});
         return;
     }
 
@@ -238,9 +247,9 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
         if (url_opt) |u| {
             var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
             defer httpBuf.deinit();
-            std.debug.print("Fetching index from {s}...\n", .{u});
+            std.log.info("Fetching index from {s}...", .{u});
             if ((try index.fetchUrl(u, &httpBuf)) != .ok) {
-                std.debug.print("error: failed to fetch index\n", .{});
+                std.log.err("failed to fetch index", .{});
                 return;
             }
             break :blk try Schema.Type.parse(ctx.gpa, httpBuf.written());
@@ -250,13 +259,13 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
                 if (ctx.userConfig.getMirrorUrl(mirror_name)) |url| {
                     var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
                     defer httpBuf.deinit();
-                    std.debug.print("Cache not found for '{s}'. Fetching from {s}...\n", .{ mirror_name, url });
+                    std.log.warn("Cache not found for '{s}'. Fetching from {s}...", .{ mirror_name, url });
                     if ((try index.fetchUrl(url, &httpBuf)) == .ok) {
                         try Schema.Type.saveCache(ctx.io, cache_path, httpBuf.written());
                         break :blk try Schema.Type.parse(ctx.gpa, httpBuf.written());
                     }
                 }
-                std.debug.print("error: failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup install {s} -S') to sync the cache.\n", .{ mirror_name, @errorName(err), ver });
+                std.log.err("failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup install {s} -S') to sync the cache.", .{ mirror_name, @errorName(err), ver });
                 return;
             };
         }
@@ -264,12 +273,12 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     defer schema.deinit();
 
     const platform = Schema.Platform.parse(targetKey()) orelse {
-        std.debug.print("error: unsupported platform: {s}\n", .{targetKey()});
+        std.log.err("unsupported platform: {s}", .{targetKey()});
         return;
     };
 
     const src = schema.get(ver, platform) orelse {
-        std.debug.print("error: no binary found for version {s} on {s}\n", .{ ver, targetKey() });
+        std.log.err("no binary found for version {s} on {s}", .{ ver, targetKey() });
         return;
     };
 
@@ -281,14 +290,14 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     try ensureDir(ctx, binDir);
 
     if (dirExists(ctx, installDir)) {
-        std.debug.print("Version {s} is already installed.\n", .{ver});
+        std.log.info("Version {s} is already installed.", .{ver});
         return;
     }
 
     var split = std.mem.splitBackwardsAny(u8, src.tarball, "/");
     const filename = split.first();
 
-    std.debug.print("Downloading {s}...\n", .{ver});
+    std.log.info("Downloading {s}...", .{ver});
 
     var downloader = dl.Downloader.init(&index.client);
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, filename, .{});
@@ -296,42 +305,42 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
 
     const dlResult = try dl.Downloader.downloadToFile(&downloader, src.tarball, file, ctx.io);
     if (dlResult.status != .ok) {
-        std.debug.print("error: failed to download tarball. HTTP {s}\n", .{@tagName(dlResult.status)});
+        std.log.err("failed to download tarball. HTTP {s}", .{@tagName(dlResult.status)});
         return;
     }
 
-    std.debug.print("Extracting to ~/.zigup/{s}...\n", .{ver});
+    std.log.info("Extracting to ~/.zigup/{s}...", .{ver});
     try std.Io.Dir.createDirAbsolute(ctx.io, installDir, .default_dir);
 
     var child = std.process.spawn(ctx.io, .{
         .argv = &.{ "tar", "-xf", filename, "-C", installDir, "--strip-components=1" },
     }) catch |err| {
-        std.debug.print("error: failed to spawn tar: {s}\n", .{@errorName(err)});
+        std.log.err("failed to spawn tar: {s}", .{@errorName(err)});
         return;
     };
     const term = child.wait(ctx.io) catch |err| {
-        std.debug.print("error: failed to wait for tar: {s}\n", .{@errorName(err)});
+        std.log.err("failed to wait for tar: {s}", .{@errorName(err)});
         return;
     };
     switch (term) {
         .exited => |code| if (code != 0) {
-            std.debug.print("error: tar failed with exit code {d}\n", .{code});
+            std.log.err("tar failed with exit code {d}", .{code});
             return;
         },
         else => {
-            std.debug.print("error: tar terminated abnormally\n", .{});
+            std.log.err("tar terminated abnormally", .{});
             return;
         },
     }
 
     std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, filename) catch {};
-    std.debug.print("Successfully installed {s}.\n", .{ver});
+    std.log.info("Successfully installed {s}.", .{ver});
 }
 
 fn runDefault(ctx: Context, ver: []const u8) !void {
     const installDir = try ctx.versionDir(ver);
     if (!dirExists(ctx, installDir)) {
-        std.debug.print("error: {s} is not installed. Use 'zigup install {s}' first.\n", .{ ver, ver });
+        std.log.err("{s} is not installed. Use 'zigup install {s}' first.", .{ ver, ver });
         return;
     }
 
@@ -346,31 +355,31 @@ fn runDefault(ctx: Context, ver: []const u8) !void {
     defer zd.close(ctx.io);
     zd.deleteFile(ctx.io, symlinkPath) catch {};
     zd.symLink(ctx.io, targetRel, symlinkPath, .{}) catch |err| {
-        std.debug.print("error: failed to create symlink: {s}\n", .{@errorName(err)});
+        std.log.err("failed to create symlink: {s}", .{@errorName(err)});
         return;
     };
 
-    std.debug.print("Set {s} as default.\n", .{ver});
+    std.log.info("Set {s} as default.", .{ver});
 }
 
 fn runDelete(ctx: Context, ver: []const u8) !void {
     const installDir = try ctx.versionDir(ver);
     if (!dirExists(ctx, installDir)) {
-        std.debug.print("warning: version {s} is not installed in ~/.zigup/\n", .{ver});
+        std.log.warn("version {s} is not installed in ~/.zigup/", .{ver});
         return;
     }
 
     const zigupDir = try ctx.zigupDir();
     var zd = std.Io.Dir.openDirAbsolute(ctx.io, zigupDir, .{}) catch |err| {
-        std.debug.print("error: ~/.zigup not found: {s}\n", .{@errorName(err)});
+        std.log.err("~/.zigup not found: {s}", .{@errorName(err)});
         return;
     };
     defer zd.close(ctx.io);
 
     zd.deleteTree(ctx.io, ver) catch |err| {
-        std.debug.print("error: failed to delete ~/.zigup/{s}: {s}\n", .{ ver, @errorName(err) });
+        std.log.err("failed to delete ~/.zigup/{s}: {s}", .{ ver, @errorName(err) });
         return;
     };
 
-    std.debug.print("Successfully deleted {s}.\n", .{ver});
+    std.log.info("Successfully deleted {s}.", .{ver});
 }

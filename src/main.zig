@@ -24,7 +24,7 @@ pub fn main(init: std.process.Init) !void {
     else if (init.environ_map.get("USERPROFILE")) |h|
         h
     else {
-        std.debug.print("error: HOME environment variable not set\n", .{});
+        std.log.err("HOME environment variable not set", .{});
         return;
     };
 
@@ -43,7 +43,7 @@ pub fn main(init: std.process.Init) !void {
     };
 
     const cmd = action.parseCommand(final_args) orelse {
-        std.debug.print("Unknown command: {s}\nUse 'zigup help' for usage details.\n", .{final_args[1]});
+        std.log.err("Unknown command: {s}. Use 'zigup help' for usage details.", .{final_args[1]});
         return;
     };
 
