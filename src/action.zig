@@ -40,23 +40,41 @@ pub const Context = struct {
     fn resolvePath(self: Context, comptime folder: Folder) ![]const u8 {
         const parts = getPlatformPath(folder);
         const env_name = parts[0];
-        const env_val = self.environMap.get(env_name) orelse {
+
+        var base_dir: []const u8 = undefined;
+        var static_parts: []const []const u8 = undefined;
+
+        if (self.environMap.get(env_name)) |val| {
+            base_dir = val;
+            static_parts = if (std.mem.startsWith(u8, env_name, "XDG_")) parts[2..] else parts[1..];
+        } else {
             if (std.mem.startsWith(u8, env_name, "XDG_")) {
                 const home = self.environMap.get("HOME") orelse return error.HomeNotFound;
-                const fallback_base = try std.fs.path.join(self.arena, &.{ home, parts[1] });
-                if (parts.len > 2) {
-                    return std.fs.path.join(self.arena, &.{ fallback_base, parts[2] });
+                base_dir = try std.fs.path.join(self.arena, &.{ home, parts[1] });
+                static_parts = parts[2..];
+            } else {
+                const builtin = @import("builtin");
+                if (builtin.os.tag == .windows) {
+                    const userprofile = self.environMap.get("USERPROFILE") orelse self.environMap.get("HOME") orelse return error.HomeNotFound;
+                    if (std.mem.eql(u8, env_name, "LOCALAPPDATA")) {
+                        base_dir = try std.fs.path.join(self.arena, &.{ userprofile, "AppData", "Local" });
+                        static_parts = parts[1..];
+                    } else if (std.mem.eql(u8, env_name, "APPDATA")) {
+                        base_dir = try std.fs.path.join(self.arena, &.{ userprofile, "AppData", "Roaming" });
+                        static_parts = parts[1..];
+                    } else {
+                        return error.EnvironmentVariableNotFound;
+                    }
+                } else {
+                    return error.EnvironmentVariableNotFound;
                 }
-                return fallback_base;
             }
-            return error.EnvironmentVariableNotFound;
-        };
+        }
 
-        const static_parts = if (std.mem.startsWith(u8, env_name, "XDG_")) parts[2..] else parts[1..];
-        if (static_parts.len == 0) return env_val;
+        if (static_parts.len == 0) return base_dir;
 
         var list = std.ArrayList([]const u8).empty;
-        try list.append(self.arena, env_val);
+        try list.append(self.arena, base_dir);
         try list.appendSlice(self.arena, static_parts);
         return std.fs.path.join(self.arena, list.items);
     }
@@ -96,10 +114,15 @@ pub fn configPath(arena: std.mem.Allocator, environMap: *const std.process.Envir
         if (std.mem.startsWith(u8, env_name, "XDG_")) {
             const home = environMap.get("HOME") orelse return error.HomeNotFound;
             const fallback_base = try std.fs.path.join(arena, &.{ home, parts[1] });
-            if (parts.len > 2) {
-                return std.fs.path.join(arena, &.{ fallback_base, parts[2] });
+            return try std.fs.path.join(arena, &.{ fallback_base, parts[2], parts[3] });
+        }
+        const builtin = @import("builtin");
+        if (builtin.os.tag == .windows) {
+            const userprofile = environMap.get("USERPROFILE") orelse environMap.get("HOME") orelse return error.HomeNotFound;
+            if (std.mem.eql(u8, env_name, "APPDATA")) {
+                const fallback_base = try std.fs.path.join(arena, &.{ userprofile, "AppData", "Roaming" });
+                return try std.fs.path.join(arena, &.{ fallback_base, parts[1], parts[2] });
             }
-            return fallback_base;
         }
         return error.EnvironmentVariableNotFound;
     };
