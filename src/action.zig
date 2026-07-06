@@ -421,6 +421,7 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
         std.log.err("failed to download tarball. HTTP {s}", .{@tagName(dlResult.status)});
         return;
     }
+    const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
 
     std.log.info("Extracting to ~/.zigup/{s}", .{ver});
     try std.Io.Dir.createDirAbsolute(ctx.io, installDir, .default_dir);
@@ -447,7 +448,7 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     }
 
     std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, filename) catch {};
-    std.log.info("Successfully installed {s}.", .{ver});
+    std.log.info("Successfully installed {s} in {d:.2}s.", .{ ver, dl_secs });
 }
 
 fn runDefault(ctx: Context, ver: []const u8) !void {
@@ -607,6 +608,7 @@ fn runUpdate(ctx: Context) !void {
         std.log.err("failed to download update: HTTP {s}", .{@tagName(dlResult.status)});
         return;
     }
+    const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
 
     if (comptime builtin.os.tag != .windows) {
         const fd = file.handle;
@@ -626,5 +628,5 @@ fn runUpdate(ctx: Context) !void {
         return;
     };
 
-    std.log.info("Successfully updated zigup to {s}.", .{release.tag_name});
+    std.log.info("Successfully updated zigup to {s} in {d:.2}s.", .{ release.tag_name, dl_secs });
 }

@@ -29,8 +29,7 @@ pub const Downloader = struct {
         var redirect_buf: [8192]u8 = undefined;
         var response = try req.receiveHead(&redirect_buf);
 
-        _ = response.head.content_length;
-
+        const content_length = response.head.content_length;
         var transfer_buf: [64]u8 = undefined;
         var decompress: std.http.Decompress = undefined;
         const decompress_buf: []u8 = switch (response.head.content_encoding) {
@@ -48,6 +47,7 @@ pub const Downloader = struct {
 
         var chunk_buf: [8192]u8 = undefined;
         var downloaded: u64 = 0;
+        var last_update: i128 = 0;
 
         while (true) {
             var chunk_writer = std.Io.Writer.fixed(&chunk_buf);
@@ -57,7 +57,22 @@ pub const Downloader = struct {
             };
             try writer.interface.writeAll(chunk_buf[0..n]);
             downloaded += n;
-            _ = std.Io.Clock.now(.awake, io).nanoseconds;
+
+            const now = std.Io.Clock.now(.awake, io).nanoseconds;
+            if (now - last_update > 100_000_000) { // 100ms throttle
+                last_update = now;
+                if (content_length) |total| {
+                    const pct = (@as(f64, @floatFromInt(downloaded)) / @as(f64, @floatFromInt(total))) * 100.0;
+                    std.log.info("\rDownloading... {d:.1}% ({d} / {d} bytes)", .{ pct, downloaded, total });
+                } else {
+                    std.log.info("\rDownloading... {d} bytes", .{downloaded});
+                }
+            }
+        }
+        if (content_length) |total| {
+            std.log.info("\rDownloading... 100.0% ({d} / {d} bytes)\n", .{ total, total });
+        } else {
+            std.log.info("\rDownloading... {d} bytes\n", .{downloaded});
         }
 
         try writer.flush();

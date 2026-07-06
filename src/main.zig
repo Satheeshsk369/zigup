@@ -2,7 +2,47 @@ const std = @import("std");
 const action = @import("action.zig");
 const config = @import("config.zig");
 
+var global_io: std.Io = undefined;
+
+pub const std_options: std.Options = .{
+    .logFn = logFn,
+};
+
+pub fn logFn(
+    comptime message_level: std.log.Level,
+    comptime scope: @TypeOf(.default),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    const stderr = std.Io.File.stderr();
+
+    // If format starts with \r (progress carriage return), print directly and don't append a newline or prefixes
+    if (format.len > 0 and format[0] == '\r') {
+        var buf: [1024]u8 = undefined;
+        const msg = std.fmt.bufPrint(&buf, format, args) catch return;
+        stderr.writeStreamingAll(global_io, msg) catch {};
+        return;
+    }
+
+    const prefix = if (scope == .default) "" else "(" ++ @tagName(scope) ++ "): ";
+    const level_txt = switch (message_level) {
+        .err => "error: ",
+        .warn => "warning: ",
+        .info => "info: ",
+        .debug => "debug: ",
+    };
+
+    var buf: [2048]u8 = undefined;
+    const msg = std.fmt.bufPrint(&buf, level_txt ++ prefix ++ format, args) catch return;
+    stderr.writeStreamingAll(global_io, msg) catch {};
+
+    if (format.len == 0 or format[format.len - 1] != '\n') {
+        stderr.writeStreamingAll(global_io, "\n") catch {};
+    }
+}
+
 pub fn main(init: std.process.Init) !void {
+    global_io = init.io;
     const gpa = init.gpa;
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
