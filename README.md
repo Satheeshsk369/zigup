@@ -5,8 +5,6 @@
 
 Run the following script to automatically detect your architecture, download the binary, and place it in `~/.local/bin/`
 
-> currently the script to install zigup is not widely tested and may fail to download in some platform. if in that case, download the release manually or build the project manually to install zigup in your system.
-
 ### Linux & macOS 
 
 ```bash
@@ -19,8 +17,6 @@ curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh
 ```powershell
 powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1')"
 ```
-*Note: Make sure to add `%USERPROFILE%\.zigup\bin` to your environment `PATH` variable.*
-
 
 ## Commands
 
