@@ -149,7 +149,7 @@ fn syncMirror(ctx: Context, mirror: []const u8) !void {
     var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
     defer httpBuf.deinit();
 
-    std.log.info("Syncing index from {s} ({s})...", .{ mirror, url });
+    std.log.info("Syncing index from {s} ({s})", .{ mirror, url });
     if ((try index.fetchUrl(url, &httpBuf)) != .ok) {
         std.log.err("failed to fetch index", .{});
         return;
@@ -401,7 +401,7 @@ fn runUpdate(ctx: Context) !void {
     defer httpBuf.deinit();
 
     const uri = try std.Uri.parse("https://api.github.com/repos/Satheeshsk369/zigup/releases/latest");
-    std.log.info("Checking for updates from GitHub...", .{});
+    std.log.info("Checking for updates from GitHub", .{});
     const resp = try client.fetch(.{
         .location = .{ .uri = uri },
         .method = .GET,
