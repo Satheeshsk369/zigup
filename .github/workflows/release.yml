@@ -32,20 +32,20 @@ jobs:
           # Linux Targets
           for arch in x86 x86_64 aarch64; do
             echo "Building Linux $arch..."
-            zig build -Doptimize=ReleaseFast -Dtarget=$arch-linux -Dstrip=true
+            zig build -Doptimize=ReleaseFast -Dtarget=$arch-linux
             cp zig-out/bin/zigup dist/zigup-$arch-linux
           done
           
           # macOS Targets (No 32-bit x86 support on macOS)
           for arch in x86_64 aarch64; do
             echo "Building macOS $arch..."
-            zig build -Doptimize=ReleaseFast -Dtarget=$arch-macos -Dstrip=true
+            zig build -Doptimize=ReleaseFast -Dtarget=$arch-macos
             cp zig-out/bin/zigup dist/zigup-$arch-macos
           done
           
           for arch in x86 x86_64 aarch64; do
             echo "Building Windows $arch..."
-            zig build -Doptimize=ReleaseFast -Dtarget=$arch-windows -Dstrip=true
+            zig build -Doptimize=ReleaseFast -Dtarget=$arch-windows
             cp zig-out/bin/zigup.exe dist/zigup-$arch-windows.exe
           done
         shell: bash
