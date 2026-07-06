@@ -52,7 +52,7 @@ pub const Config = struct {
         const stat = try file.stat(io);
         var f_buf: [65536]u8 = undefined;
         var r = file.reader(io, &f_buf);
-        const content = try r.interface.readAlloc(gpa, stat.size);
+        const content = try r.interface.readAlloc(gpa, @intCast(stat.size));
         defer gpa.free(content);
 
         const content_z = try gpa.dupeZ(u8, content);

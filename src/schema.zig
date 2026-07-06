@@ -84,7 +84,7 @@ pub const Type = struct {
         const stat = try file.stat(io);
         var f_buf: [65536]u8 = undefined;
         var r = file.reader(io, &f_buf);
-        const content = try r.interface.readAlloc(allocator, stat.size);
+        const content = try r.interface.readAlloc(allocator, @intCast(stat.size));
         defer allocator.free(content);
         return try parse(allocator, content);
     }
