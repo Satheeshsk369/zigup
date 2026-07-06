@@ -3,14 +3,18 @@ const adt = @import("adt");
 
 pub const Set = adt.Set(null);
 
+pub fn Group(comptime E: type, comptime Payload: type, comptime label: ?[]const u8) type {
+    return struct {
+        pub const Type = E;
+        pub const Union = Set.enumToUnion(E, Payload);
+        pub const argLabel = label;
+    };
+}
+
 pub const A = enum(u2) {
     help,
     version,
     env,
-
-    pub const argCount = 0;
-    pub const PayloadType: type = void;
-    pub const argLabel: ?[]const u8 = null;
 
     pub fn info(self: @This()) []const u8 {
         return switch (self) {
@@ -27,10 +31,6 @@ pub const C = enum(u2) {
     default,
     list,
 
-    pub const argCount = 1;
-    pub const PayloadType: type = []const u8;
-    pub const argLabel: ?[]const u8 = "<TAG>";
-
     pub fn info(self: @This()) []const u8 {
         return switch (self) {
             .install => "Download and install a version",
@@ -41,18 +41,18 @@ pub const C = enum(u2) {
     }
 };
 
-pub const A1 = Set.enumToUnion(A, A.PayloadType);
-pub const C1 = Set.enumToUnion(C, C.PayloadType);
+pub const GroupA = Group(A, void, null);
+pub const GroupC = Group(C, []const u8, "<TAG>");
 
-pub const Command = Set.join(A1, C1);
+pub const Command = Set.join(GroupA.Union, GroupC.Union);
 
 pub const Entry = struct { verb: []const u8, argLabel: ?[]const u8, description: []const u8 };
 
-fn appendEntries(comptime T: type, comptime out: []Entry, comptime start: usize) usize {
+fn appendEntries(comptime G: type, comptime out: []Entry, comptime start: usize) usize {
     var i = start;
-    for (@typeInfo(T).@"enum".fields) |f| {
-        const v: T = @enumFromInt(f.value);
-        const label = if (std.mem.eql(u8, f.name, "list")) "<MIRROR>" else T.argLabel;
+    for (@typeInfo(G.Type).@"enum".fields) |f| {
+        const v: G.Type = @enumFromInt(f.value);
+        const label = if (std.mem.eql(u8, f.name, "list")) "<MIRROR>" else G.argLabel;
         out[i] = .{ .verb = f.name, .argLabel = label, .description = v.info() };
         i += 1;
     }
@@ -64,8 +64,8 @@ pub const commands: []const Entry = blk: {
         @typeInfo(C).@"enum".fields.len;
     var out: [n]Entry = undefined;
     var i: usize = 0;
-    i = appendEntries(A, &out, i);
-    i = appendEntries(C, &out, i);
+    i = appendEntries(GroupA, &out, i);
+    i = appendEntries(GroupC, &out, i);
     const frozen = out;
     break :blk &frozen;
 };

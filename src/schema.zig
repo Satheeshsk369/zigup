@@ -36,7 +36,6 @@ pub const Source = struct {
 };
 
 pub const Arch = enum { x86_64, aarch64, arm, riscv64, powerpc64le, x86, loongarch64, s390x };
-
 pub const OS = enum { macos, linux, windows, freebsd, netbsd, openbsd };
 
 pub const Platform = struct {
