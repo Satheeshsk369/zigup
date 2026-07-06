@@ -158,7 +158,7 @@ fn ensureDir(ctx: Context, path: []const u8) !void {
 pub fn run(cmd: Command, ctx: Context) !void {
     switch (cmd) {
         .help => runHelp(),
-        .version => std.debug.print("zigup version 0.1.0\n", .{}),
+        .version => std.debug.print("zigup version 0.2.0\n", .{}),
         .env => try runEnv(ctx),
         .list => |mirror| try runList(ctx, mirror),
         .install => |ver| try runInstall(ctx, ver),
