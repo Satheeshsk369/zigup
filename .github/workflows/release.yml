@@ -20,10 +20,9 @@ jobs:
 
       - name: Install Zig 0.16.0 (Official Nightly)
         run: |
-          URL=$(curl -s https://ziglang.org/download/index.json | jq -r '.["0.16.0"]."x86_64-linux".tarball // .master."x86_64-linux".tarball')
-          curl -LO "$URL"
-          tar -xf zig-linux-x86_64-*.tar.xz --strip-components=1
-          echo "$GITHUB_WORKSPACE" >> $GITHUB_PATH
+          URL=$(curl -s https://ziglang.org/download/index.json | jq -r '.["0.16.0"]."x86_64-linux".tarball')
+          curl -L "$URL" -o zig.tar.xz
+          tar -xf zig.tar.xz --strip-components=1
         shell: bash
       - name: Cross-Compile Binaries
         run: |
