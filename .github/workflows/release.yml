@@ -18,11 +18,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Zig 0.16.0 (Official)
+      - name: Install Zig 0.16.0 (Official Nightly)
         run: |
-          curl -LO https://ziglang.org/download/0.16.0/zig-linux-x86_64-0.16.0.tar.xz
-          tar -xf zig-linux-x86_64-0.16.0.tar.xz
-          echo "$GITHUB_WORKSPACE/zig-linux-x86_64-0.16.0" >> $GITHUB_PATH
+          URL=$(curl -s https://ziglang.org/download/index.json | jq -r '.["0.16.0"]."x86_64-linux".tarball // .master."x86_64-linux".tarball')
+          curl -LO "$URL"
+          tar -xf zig-linux-x86_64-*.tar.xz --strip-components=1
+          echo "$GITHUB_WORKSPACE" >> $GITHUB_PATH
         shell: bash
       - name: Cross-Compile Binaries
         run: |
