@@ -18,11 +18,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Zig
-        uses: mlugg/setup-zig@v1
-        with:
-          version: 0.16.0
-          mirror: https://ziglang.org/download
+      - name: Install Zig 0.16.0 (Official)
+        run: |
+          curl -LO https://ziglang.org/download/0.16.0/zig-linux-x86_64-0.16.0.tar.xz
+          tar -xf zig-linux-x86_64-0.16.0.tar.xz
+          echo "$GITHUB_WORKSPACE/zig-linux-x86_64-0.16.0" >> $GITHUB_PATH
+        shell: bash
       - name: Cross-Compile Binaries
         run: |
           mkdir -p dist
