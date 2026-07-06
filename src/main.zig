@@ -8,34 +8,23 @@ pub fn main(init: std.process.Init) !void {
     const args = try init.minimal.args.toSlice(arena);
 
     var sync = false;
-    var filtered_args = std.ArrayList([]const u8).empty;
-    defer filtered_args.deinit(arena);
-    for (args) |arg| {
-        if (std.mem.eql(u8, arg, "-S")) {
-            sync = true;
-        } else {
-            try filtered_args.append(arena, arg);
-        }
+    var final_args = args;
+    if (args.len >= 2 and std.mem.eql(u8, args[1], "-S")) {
+        sync = true;
+        var list = std.ArrayList([:0]const u8).empty;
+        try list.append(arena, args[0]);
+        try list.appendSlice(arena, args[2..]);
+        final_args = list.items;
     }
-    const final_args = filtered_args.items;
 
-    const home = if (init.environ_map.get("HOME")) |h|
-        h
-    else if (init.environ_map.get("USERPROFILE")) |h|
-        h
-    else {
-        std.log.err("HOME environment variable not set", .{});
-        return;
-    };
-
-    const config_zon_path = try std.fs.path.join(arena, &.{ home, ".zigup", "config.zon" });
+    const config_zon_path = try action.configPath(arena, init.environ_map);
     const config_val = try config.Config.loadOrInit(arena, init.io, config_zon_path);
 
     const ctx = action.Context{
         .gpa = gpa,
         .arena = arena,
         .io = init.io,
-        .home = home,
+        .environMap = init.environ_map,
         .pathEnv = init.environ_map.get("PATH") orelse "",
         .userConfig = config_val,
         .args = final_args,

@@ -7,32 +7,111 @@ const config = @import("config.zig");
 pub const Command = command.Command;
 pub const Mirror = Schema.Index.Mirror;
 
+pub const Folder = enum { config, cache, data, bin };
+
+pub fn getPlatformPath(comptime folder: Folder) []const []const u8 {
+    const builtin = @import("builtin");
+    return switch (builtin.os.tag) {
+        .windows => switch (folder) {
+            .config => &.{ "APPDATA", "zigup", "config.zon" },
+            .cache => &.{ "LOCALAPPDATA", "zigup", "cache" },
+            .data => &.{ "LOCALAPPDATA", "zigup" },
+            .bin => &.{ "LOCALAPPDATA", "zigup", "bin" },
+        },
+        else => switch (folder) {
+            .config => &.{ "XDG_CONFIG_HOME", ".config", "zigup", "config.zon" },
+            .cache => &.{ "XDG_CACHE_HOME", ".cache", "zigup" },
+            .data => &.{ "XDG_DATA_HOME", ".local", "share", "zig" },
+            .bin => &.{ "HOME", ".local", "bin" },
+        },
+    };
+}
+
 pub const Context = struct {
     gpa: std.mem.Allocator,
     arena: std.mem.Allocator,
     io: std.Io,
-    home: []const u8,
+    environMap: *const std.process.Environ.Map,
     pathEnv: []const u8,
     userConfig: config.Config,
     args: []const []const u8,
     sync: bool,
 
-    pub fn zigupDir(self: Context) ![]const u8 {
-        return std.fs.path.join(self.arena, &.{ self.home, ".zigup" });
-    }
+    fn resolvePath(self: Context, comptime folder: Folder) ![]const u8 {
+        const parts = getPlatformPath(folder);
+        const env_name = parts[0];
+        const env_val = self.environMap.get(env_name) orelse {
+            if (std.mem.startsWith(u8, env_name, "XDG_")) {
+                const home = self.environMap.get("HOME") orelse return error.HomeNotFound;
+                const fallback_base = try std.fs.path.join(self.arena, &.{ home, parts[1] });
+                if (parts.len > 2) {
+                    return std.fs.path.join(self.arena, &.{ fallback_base, parts[2] });
+                }
+                return fallback_base;
+            }
+            return error.EnvironmentVariableNotFound;
+        };
 
-    pub fn versionDir(self: Context, ver: []const u8) ![]const u8 {
-        return std.fs.path.join(self.arena, &.{ self.home, ".zigup", ver });
-    }
+        const static_parts = if (std.mem.startsWith(u8, env_name, "XDG_")) parts[2..] else parts[1..];
+        if (static_parts.len == 0) return env_val;
 
-    pub fn binDir(self: Context) ![]const u8 {
-        return std.fs.path.join(self.arena, &.{ self.home, ".zigup", "bin" });
+        var list = std.ArrayList([]const u8).empty;
+        try list.append(self.arena, env_val);
+        try list.appendSlice(self.arena, static_parts);
+        return std.fs.path.join(self.arena, list.items);
     }
 
     pub fn cacheFile(self: Context, mirror: []const u8) ![]const u8 {
-        return std.fs.path.join(self.arena, &.{ self.home, ".zigup", "cache", try std.fmt.allocPrint(self.arena, "{s}.json", .{mirror}) });
+        const base = try self.resolvePath(.cache);
+        const filename = try std.fmt.allocPrint(self.arena, "{s}.json", .{mirror});
+        return std.fs.path.join(self.arena, &.{ base, filename });
+    }
+
+    pub fn dataDir(self: Context) ![]const u8 {
+        return self.resolvePath(.data);
+    }
+
+    pub fn versionDir(self: Context, ver: []const u8) ![]const u8 {
+        return std.fs.path.join(self.arena, &.{ try self.dataDir(), ver });
+    }
+
+    pub fn binDir(self: Context) ![]const u8 {
+        return self.resolvePath(.bin);
+    }
+
+    pub fn configDir(self: Context) ![]const u8 {
+        const path = try configPath(self.arena, self.environMap);
+        return std.fs.path.dirname(path) orelse path;
+    }
+
+    pub fn cacheDir(self: Context) ![]const u8 {
+        return self.resolvePath(.cache);
     }
 };
+
+pub fn configPath(arena: std.mem.Allocator, environMap: *const std.process.Environ.Map) ![]const u8 {
+    const parts = getPlatformPath(.config);
+    const env_name = parts[0];
+    const env_val = environMap.get(env_name) orelse {
+        if (std.mem.startsWith(u8, env_name, "XDG_")) {
+            const home = environMap.get("HOME") orelse return error.HomeNotFound;
+            const fallback_base = try std.fs.path.join(arena, &.{ home, parts[1] });
+            if (parts.len > 2) {
+                return std.fs.path.join(arena, &.{ fallback_base, parts[2] });
+            }
+            return fallback_base;
+        }
+        return error.EnvironmentVariableNotFound;
+    };
+
+    const static_parts = if (std.mem.startsWith(u8, env_name, "XDG_")) parts[2..] else parts[1..];
+    if (static_parts.len == 0) return env_val;
+
+    var list = std.ArrayList([]const u8).empty;
+    try list.append(arena, env_val);
+    try list.appendSlice(arena, static_parts);
+    return std.fs.path.join(arena, list.items);
+}
 
 fn targetKey() []const u8 {
     const builtin = @import("builtin");
@@ -129,12 +208,22 @@ fn runHelp() void {
 }
 
 fn runEnv(ctx: Context) !void {
-    const needle = try ctx.binDir();
-    if (std.mem.indexOf(u8, ctx.pathEnv, needle) != null) {
-        std.log.info("~/.zigup/bin is in your PATH", .{});
-    } else {
-        std.log.warn("~/.zigup/bin is NOT in your PATH. Please add it.", .{});
-    }
+    std.debug.print(
+        \\.{{
+        \\    .ZIGUP = "{s}",
+        \\    .BIN = "{s}",
+        \\    .CONFIG = "{s}",
+        \\    .DATA = "{s}",
+        \\    .CACHE = "{s}",
+        \\}}
+        \\
+    , .{
+        std.process.executablePathAlloc(ctx.io, ctx.arena) catch "zigup",
+        try ctx.binDir(),
+        try ctx.userConfig,
+        try ctx.dataDir(),
+        try ctx.cacheDir(),
+    });
 }
 
 fn syncMirror(ctx: Context, mirror: []const u8) !void {
@@ -194,9 +283,9 @@ fn runList(ctx: Context, mirror_arg: []const u8) !void {
             std.debug.print(" - {s} ({s})\n", .{ item.key, item.date });
         }
     } else {
-        const zigup_dir_path = try ctx.zigupDir();
-        var dir = std.Io.Dir.openDirAbsolute(ctx.io, zigup_dir_path, .{ .iterate = true }) catch |err| {
-            std.log.warn("No installed versions found (~/.zigup does not exist): {s}", .{@errorName(err)});
+        const data_dir = try ctx.dataDir();
+        var dir = std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{ .iterate = true }) catch |err| {
+            std.log.warn("No installed versions found: {s}", .{@errorName(err)});
             return;
         };
         defer dir.close(ctx.io);
@@ -283,11 +372,11 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
         return;
     };
 
-    const zigupDir = try ctx.zigupDir();
+    const dataDir = try ctx.dataDir();
     const binDir = try ctx.binDir();
     const installDir = try ctx.versionDir(ver);
 
-    try ensureDir(ctx, zigupDir);
+    try ensureDir(ctx, dataDir);
     try ensureDir(ctx, binDir);
 
     if (dirExists(ctx, installDir)) {
@@ -345,20 +434,44 @@ fn runDefault(ctx: Context, ver: []const u8) !void {
         return;
     }
 
-    const zigupDir = try ctx.zigupDir();
     const binDir = try ctx.binDir();
     try ensureDir(ctx, binDir);
 
-    const symlinkPath = try std.fs.path.join(ctx.arena, &.{ binDir, "zig" });
-    const targetRel = try std.fs.path.join(ctx.arena, &.{ "..", ver, "zig" });
+    const builtin = @import("builtin");
+    if (comptime builtin.os.tag == .windows) {
+        const src_exe = try std.fs.path.join(ctx.arena, &.{ installDir, "zig.exe" });
+        const dst_exe = try std.fs.path.join(ctx.arena, &.{ binDir, "zig.exe" });
 
-    var zd = std.Io.Dir.openDirAbsolute(ctx.io, zigupDir, .{}) catch return;
-    defer zd.close(ctx.io);
-    zd.deleteFile(ctx.io, symlinkPath) catch {};
-    zd.symLink(ctx.io, targetRel, symlinkPath, .{}) catch |err| {
-        std.log.err("failed to create symlink: {s}", .{@errorName(err)});
-        return;
-    };
+        var src_file = try std.Io.Dir.openFileAbsolute(ctx.io, src_exe, .{});
+        defer src_file.close(ctx.io);
+
+        var dst_file = try std.Io.Dir.createFileAbsolute(ctx.io, dst_exe, .{});
+        defer dst_file.close(ctx.io);
+
+        var f_buf: [65536]u8 = undefined;
+        var r = src_file.reader(ctx.io, &f_buf);
+        var w = dst_file.writer(ctx.io, &f_buf);
+
+        var chunk: [65536]u8 = undefined;
+        while (true) {
+            const n = try r.interface.readSliceShort(&chunk);
+            if (n == 0) break;
+            try w.interface.writeAll(chunk[0..n]);
+        }
+        try w.flush();
+    } else {
+        const symlinkPath = try std.fs.path.join(ctx.arena, &.{ binDir, "zig" });
+        const targetRel = try std.fmt.allocPrint(ctx.arena, "../share/zig/{s}/zig", .{ver});
+
+        var bd = std.Io.Dir.openDirAbsolute(ctx.io, binDir, .{}) catch return;
+        defer bd.close(ctx.io);
+
+        bd.deleteFile(ctx.io, symlinkPath) catch {};
+        bd.symLink(ctx.io, targetRel, "zig", .{}) catch |err| {
+            std.log.err("failed to create symlink: {s}", .{@errorName(err)});
+            return;
+        };
+    }
 
     std.log.info("Set {s} as default.", .{ver});
 }
@@ -366,19 +479,19 @@ fn runDefault(ctx: Context, ver: []const u8) !void {
 fn runDelete(ctx: Context, ver: []const u8) !void {
     const installDir = try ctx.versionDir(ver);
     if (!dirExists(ctx, installDir)) {
-        std.log.warn("version {s} is not installed in ~/.zigup/", .{ver});
+        std.log.warn("version {s} is not installed", .{ver});
         return;
     }
 
-    const zigupDir = try ctx.zigupDir();
-    var zd = std.Io.Dir.openDirAbsolute(ctx.io, zigupDir, .{}) catch |err| {
-        std.log.err("~/.zigup not found: {s}", .{@errorName(err)});
+    const data_dir = try ctx.dataDir();
+    var zd = std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{}) catch |err| {
+        std.log.err("data directory not found: {s}", .{@errorName(err)});
         return;
     };
     defer zd.close(ctx.io);
 
     zd.deleteTree(ctx.io, ver) catch |err| {
-        std.log.err("failed to delete ~/.zigup/{s}: {s}", .{ ver, @errorName(err) });
+        std.log.err("failed to delete version '{s}': {s}", .{ ver, @errorName(err) });
         return;
     };
 

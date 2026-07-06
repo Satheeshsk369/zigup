@@ -21,7 +21,7 @@ pub const A = enum(u2) {
         return switch (self) {
             .help => "Print this message",
             .version => "Print zigup tool version",
-            .env => "Print status of ~/.zigup/bin in your PATH",
+            .env => "Print configuration and environment paths",
             .update => "Update zigup to the latest release version",
         };
     }

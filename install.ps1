@@ -11,14 +11,18 @@ switch ($arch) {
 
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$response = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest"
-if ($response -is [string]) {
-    $release = ConvertFrom-Json $response
-} else {
-    $release = $response
-}
-$tag = $release.tag_name
-if (-not $tag) { $tag = "v0.1.0" }
+$tag = "v0.1.0"
+try {
+    $response = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest"
+    if ($response -is [string]) {
+        $release = ConvertFrom-Json $response
+    } else {
+        $release = $response
+    }
+    if ($release.tag_name) {
+        $tag = $release.tag_name
+    }
+} catch {}
 
 $binaryName = "zigup-$arch-windows.exe"
 $url = "https://github.com/Satheeshsk369/zigup/releases/download/$tag/$binaryName"
