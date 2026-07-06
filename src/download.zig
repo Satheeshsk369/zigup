@@ -58,11 +58,9 @@ pub const Downloader = struct {
             try writer.interface.writeAll(chunk_buf[0..n]);
             downloaded += n;
             _ = std.Io.Clock.now(.awake, io).nanoseconds;
-            // no update progress
         }
 
         try writer.flush();
-        // no end progress
 
         const stop = std.Io.Clock.now(.awake, io).nanoseconds;
         return .{ .status = response.head.status, .duration = stop - start };
