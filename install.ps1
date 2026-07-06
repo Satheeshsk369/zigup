@@ -16,9 +16,24 @@ New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 Write-Host "Downloading zigup $tag ($arch)..."
 Invoke-WebRequest -Uri $url -OutFile $dest
 
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User") -split ";" | Where-Object { $_ } | ForEach-Object { $_.Trim().TrimEnd('\') }
-if ($userPath -notcontains $binDir.TrimEnd('\')) {
-    [Environment]::SetEnvironmentVariable("Path", ($userPath + $binDir) -join ";", "User")
+$rawUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($null -eq $rawUserPath) {
+    $rawUserPath = ""
+}
+
+# Resolve and clean paths to check if it exists accurately
+$userPathList = $rawUserPath -split ";" | Where-Object { $_ } | ForEach-Object { [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($_)).TrimEnd('\') }
+$resolvedBinDir = [System.IO.Path]::GetFullPath($binDir).TrimEnd('\')
+
+if ($userPathList -notcontains $resolvedBinDir) {
+    $newPath = if ($rawUserPath -eq "") { $binDir } else { $rawUserPath.TrimEnd(';') + ";" + $binDir }
+    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
     $env:PATH += ";$binDir"
+    
+    # Notify Windows that environment variables have changed
+    $signature = '[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
+    $type = Add-Type -MemberDefinition $signature -Name "Win32SendMessage" -Namespace "Win32" -PassThru
+    $result = [UIntPtr]::Zero
+    $type::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$result) | Out-Null
 }
 Write-Host "zigup installed. Open a new terminal or run: zigup help"
