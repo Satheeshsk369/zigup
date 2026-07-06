@@ -3,7 +3,7 @@
 
 ## Install
 
-Run the following script to automatically detect your architecture, download the binary, and place it in `~/.zigup/bin/`
+Run the following script to automatically detect your architecture, download the binary, and place it in `~/.local/bin/`
 
 > currently the script to install zigup is not widely tested and may fail to download in some platform. if in that case, download the release manually or build the project manually to install zigup in your system.
 
@@ -12,7 +12,7 @@ Run the following script to automatically detect your architecture, download the
 ```bash
 curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
 ```
-*Note: Make sure to add `~/.zigup/bin` to your shell profile `PATH` (e.g. `~/.bashrc`, `~/.zshrc` or `~/.profile`).*
+*Note: Make sure to add `~/.local/bin` to your shell profile `PATH` (e.g. `~/.bashrc`, `~/.zshrc` or `~/.profile`).*
 
 ### Windows Powershell
 
@@ -29,7 +29,7 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 - **`list [MIRROR]`**: Lists locally installed versions (or cached remote versions if a mirror name is provided). Use `-S` to sync.
 - **`delete <TAG>`**: Uninstalls a local Zig version.
 - **`update`**: Updates `zigup` to the latest release binary.
-- **`env`**: Checks if the `~/.zigup/bin` directory is configured in your system `PATH`.
+- **`env`**: Checks if the `~/.local/bin` directory is configured in your system `PATH`.
 
 ## Configuration
 

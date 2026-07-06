@@ -29,10 +29,11 @@ fi
 BINARY_NAME="zigup-${ARCH}-${OS}"
 DOWNLOAD_URL="https://github.com/Satheeshsk369/zigup/releases/download/${TAG}/${BINARY_NAME}"
 
-mkdir -p "$HOME/.zigup/bin"
+BIN_DIR="${XDG_DATA_HOME:-$HOME/.local}/bin"
+mkdir -p "$BIN_DIR"
 
 echo "Downloading zigup for ${OS}-${ARCH}..."
-curl -sSfL "$DOWNLOAD_URL" -o "$HOME/.zigup/bin/zigup"
-chmod +x "$HOME/.zigup/bin/zigup"
+curl -sSfL "$DOWNLOAD_URL" -o "$BIN_DIR/zigup"
+chmod +x "$BIN_DIR/zigup"
 
-echo "Successfully installed zigup to $HOME/.zigup/bin/zigup"
+echo "Successfully installed zigup to $BIN_DIR/zigup"
