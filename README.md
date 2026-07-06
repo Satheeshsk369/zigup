@@ -14,7 +14,7 @@ curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh
 ```
 *Note: Make sure to add `~/.zigup/bin` to your shell profile `PATH` (e.g. `~/.bashrc`, `~/.zshrc` or `~/.profile`).*
 
-### Windows 
+### Windows Powershell
 
 ```powershell
 irm https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1 | iex
