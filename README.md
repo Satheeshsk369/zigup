@@ -3,7 +3,9 @@
 
 ## Install
 
-Run the following in script to automatically detect your architecture, download the binary, and place it in `~/.zigup/bin/`
+Run the following script to automatically detect your architecture, download the binary, and place it in `~/.zigup/bin/`
+
+> currently the script to install zigup is not widely tested and may fail to download in some platform. if in that case, download the release manually or build the project manually to install zigup in your system.
 
 ### Linux & macOS 
 

@@ -11,7 +11,12 @@ switch ($arch) {
 
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest"
+$response = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest"
+if ($response -is [string]) {
+    $release = ConvertFrom-Json $response
+} else {
+    $release = $response
+}
 $tag = $release.tag_name
 if (-not $tag) { $tag = "v0.1.0" }
 
