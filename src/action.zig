@@ -220,7 +220,7 @@ fn runEnv(ctx: Context) !void {
     , .{
         std.process.executablePathAlloc(ctx.io, ctx.arena) catch "zigup",
         try ctx.binDir(),
-        try ctx.userConfig,
+        try configPath(ctx.arena, ctx.environMap),
         try ctx.dataDir(),
         try ctx.cacheDir(),
     });
