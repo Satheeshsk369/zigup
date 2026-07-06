@@ -16,6 +16,9 @@ New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 Write-Host "Downloading zigup $tag ($arch)..."
 Invoke-WebRequest -Uri $url -OutFile $dest
 
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User") -split ";" | Where-Object { $_ }
-if ($userPath -notcontains $binDir) { [Environment]::SetEnvironmentVariable("Path", ($userPath + $binDir) -join ";", "User"); $env:PATH += ";$binDir" }
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User") -split ";" | Where-Object { $_ } | ForEach-Object { $_.Trim().TrimEnd('\') }
+if ($userPath -notcontains $binDir.TrimEnd('\')) {
+    [Environment]::SetEnvironmentVariable("Path", ($userPath + $binDir) -join ";", "User")
+    $env:PATH += ";$binDir"
+}
 Write-Host "zigup installed. Open a new terminal or run: zigup help"
