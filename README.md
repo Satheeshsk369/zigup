@@ -17,7 +17,7 @@ curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh
 ### Windows Powershell
 
 ```powershell
-irm https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1 | iex
+powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1')"
 ```
 *Note: Make sure to add `%USERPROFILE%\.zigup\bin` to your environment `PATH` variable.*
 
@@ -33,8 +33,7 @@ irm https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1 | iex
 
 ## Configuration
 
-`zigup` automatically generates a configuration file at `~/.zigup/config.zon` on its first run. You can add new custom index mirrors directly to this list:
-
+`zigup` automatically generates a configuration file at `~/.config/zigup/config.zon` (or `%APPDATA%\zigup\config.zon` on Windows) on its first run. You can add new custom index mirrors directly to this list:
 ```zig
 .{
     .mirrors = .{
