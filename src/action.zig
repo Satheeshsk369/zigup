@@ -297,7 +297,7 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     var split = std.mem.splitBackwardsAny(u8, src.tarball, "/");
     const filename = split.first();
 
-    std.log.info("Downloading {s}...", .{ver});
+    std.log.info("Downloading {s}", .{ver});
 
     var downloader = dl.Downloader.init(&index.client);
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, filename, .{});
@@ -309,7 +309,7 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
         return;
     }
 
-    std.log.info("Extracting to ~/.zigup/{s}...", .{ver});
+    std.log.info("Extracting to ~/.zigup/{s}", .{ver});
     try std.Io.Dir.createDirAbsolute(ctx.io, installDir, .default_dir);
 
     var child = std.process.spawn(ctx.io, .{

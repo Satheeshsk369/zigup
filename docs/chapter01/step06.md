@@ -25,3 +25,66 @@ src
 - entire app is simplified into action, config, download, schema
 - the config now properly used the advantage of adt (what i imagined)
 - moving towards `~/.zigup/config.zon` and generic mirror url support
+
+
+
+- Now completed the simplification with the following abstraction
+
+  ```bash
+  ❯ tree src
+  src
+  ├── action.zig
+  ├── command.zig
+  ├── config.zig
+  ├── download.zig
+  ├── main.zig
+  └── schema.zig
+  
+  1 directory, 6 files
+  ```
+
+- For also defined the ~/.zigup dir evolution
+
+  ```bash
+  ~/.zigup
+  ❯ tree -L 2
+  .
+  ├── 0.16.0
+  │   ├── doc
+  │   ├── lib
+  │   ├── LICENSE
+  │   ├── README.md
+  │   └── zig
+  ├── bin
+  │   ├── zig -> ../master/zig
+  │   └── zigup
+  ├── cache
+  │   ├── mach.json
+  │   └── ziglang.json
+  ├── config.zon
+  └── master
+      ├── doc
+      ├── lib
+      ├── LICENSE
+      ├── README.md
+      └── zig
+  
+  9 directories, 11 files
+  ```
+
+- And also only config is the mirrors
+
+  ```zig
+  ~/.zigup
+  ❯ cat config.zon
+  .{
+      .mirrors = .{
+          .{ .name = "ziglang", .url = "https://ziglang.org/download/index.json" },
+          .{ .name = "mach", .url = "https://pkg.hexops.org/zig/index.json" },
+      },
+      .defaultMirror = "ziglang",
+  } 
+  ```
+
+- Now it is in the state of what i expected when starting this repo.
+- And congratulations to me 😀. The Core idea is completed.

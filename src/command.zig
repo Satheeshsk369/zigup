@@ -36,7 +36,7 @@ pub const C = enum(u2) {
             .install => "Download and install a version",
             .delete => "Delete an installed version",
             .default => "Set an installed version as the active default",
-            .list => "List remote versions from cached index",
+            .list => "List local installs (or remote versions if mirror is specified)",
         };
     }
 };
