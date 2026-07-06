@@ -10,24 +10,12 @@ pub const Index = struct {
 
     const Self = @This();
 
-    pub const Mirror = enum(u1) {
-        ziglang,
-        mach,
-
-        pub fn url(index: Mirror) []const u8 {
-            return switch (index) {
-                .ziglang => "https://ziglang.org/download/index.json",
-                .mach => "https://pkg.hexops.org/zig/index.json",
-            };
-        }
-    };
-
     pub fn init(gpa: std.mem.Allocator, io: std.Io) Self {
         return Self{ .client = .{ .allocator = gpa, .io = io } };
     }
 
-    pub fn fetch(self: *Self, index: Mirror, body: *Allocating) !std.http.Status {
-        const uri = try std.Uri.parse(index.url());
+    pub fn fetchUrl(self: *Self, url_str: []const u8, body: *Allocating) !std.http.Status {
+        const uri = try std.Uri.parse(url_str);
         const response = try self.client.fetch(.{
             .location = .{ .uri = uri },
             .method = .GET,
@@ -47,43 +35,19 @@ pub const Source = struct {
     size: usize,
 };
 
-pub const Platform = enum {
-    @"x86_64-macos",
-    @"aarch64-macos",
-    @"x86_64-linux",
-    @"aarch64-linux",
-    @"arm-linux",
-    @"riscv64-linux",
-    @"powerpc64le-linux",
-    @"x86-linux",
-    @"loongarch64-linux",
-    @"s390x-linux",
-    @"x86_64-windows",
-    @"aarch64-windows",
-    @"x86-windows",
-    @"aarch64-freebsd",
-    @"arm-freebsd",
-    @"powerpc64le-freebsd",
-    @"riscv64-freebsd",
-    @"x86_64-freebsd",
-    @"aarch64-netbsd",
-    @"arm-netbsd",
-    @"riscv64-netbsd",
-    @"x86-netbsd",
-    @"x86_64-netbsd",
-    @"aarch64-openbsd",
-    @"arm-openbsd",
-    @"riscv64-openbsd",
-    @"x86_64-openbsd",
+pub const Arch = enum { x86_64, aarch64, arm, riscv64, powerpc64le, x86, loongarch64, s390x };
 
-    const Self = @This();
+pub const OS = enum { macos, linux, windows, freebsd, netbsd, openbsd };
 
-    pub fn parse(platform: []const u8) ?Platform {
-        return std.meta.stringToEnum(Self, platform);
+pub const Platform = struct {
+    pub const Combination = Set.cartesianProduct(Arch, OS, .{ .separator = "-" });
+
+    pub fn parse(platform: []const u8) ?Combination {
+        return std.meta.stringToEnum(Combination, platform);
     }
 
     pub fn toUnion(comptime FieldType: type) type {
-        return Set.enumToUnion(Self, FieldType);
+        return Set.enumToUnion(Combination, FieldType);
     }
 };
 
@@ -115,7 +79,33 @@ pub const Type = struct {
         return Type{ .parsed = parsed };
     }
 
-    pub fn get(self: Type, version: []const u8, platform: Platform) ?Source {
+    pub fn loadCache(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Type {
+        const file = try std.Io.Dir.openFileAbsolute(io, path, .{});
+        defer file.close(io);
+        const stat = try file.stat(io);
+        var f_buf: [65536]u8 = undefined;
+        var r = file.reader(io, &f_buf);
+        const content = try r.interface.readAlloc(allocator, stat.size);
+        defer allocator.free(content);
+        return try parse(allocator, content);
+    }
+
+    pub fn saveCache(io: std.Io, path: []const u8, content: []const u8) !void {
+        if (std.fs.path.dirname(path)) |dir| {
+            std.Io.Dir.createDirAbsolute(io, dir, .default_dir) catch |e| switch (e) {
+                error.PathAlreadyExists => {},
+                else => return e,
+            };
+        }
+        var file = try std.Io.Dir.createFileAbsolute(io, path, .{});
+        defer file.close(io);
+        var f_buf: [65536]u8 = undefined;
+        var writer = file.writer(io, &f_buf);
+        try writer.interface.writeAll(content);
+        try writer.flush();
+    }
+
+    pub fn get(self: Type, version: []const u8, platform: Platform.Combination) ?Source {
         const detail = self.parsed.value.map.get(version) orelse return null;
         const target_name = @tagName(platform);
         inline for (std.meta.fields(VersionDetail)) |f| {
@@ -132,18 +122,3 @@ pub const Type = struct {
         self.parsed.deinit();
     }
 };
-
-pub fn diff(target: Type, source: Type, out_buffer: [][]const u8) []const []const u8 {
-    var count: usize = 0;
-    var it = target.parsed.value.map.iterator();
-    while (it.next()) |entry| {
-        const key = entry.key_ptr.*;
-        if (!source.parsed.value.map.contains(key)) {
-            if (count < out_buffer.len) {
-                out_buffer[count] = key;
-                count += 1;
-            }
-        }
-    }
-    return out_buffer[0..count];
-}

@@ -1,9 +1,10 @@
 const std = @import("std");
 const Schema = @import("schema.zig");
 const dl = @import("download.zig");
+const command = @import("command.zig");
 const config = @import("config.zig");
 
-pub const Command = config.Command;
+pub const Command = command.Command;
 pub const Mirror = Schema.Index.Mirror;
 
 pub const Context = struct {
@@ -12,6 +13,9 @@ pub const Context = struct {
     io: std.Io,
     home: []const u8,
     pathEnv: []const u8,
+    userConfig: config.Config,
+    args: []const []const u8,
+    sync: bool,
 
     pub fn zigupDir(self: Context) ![]const u8 {
         return std.fs.path.join(self.arena, &.{ self.home, ".zigup" });
@@ -23,6 +27,10 @@ pub const Context = struct {
 
     pub fn binDir(self: Context) ![]const u8 {
         return std.fs.path.join(self.arena, &.{ self.home, ".zigup", "bin" });
+    }
+
+    pub fn cacheFile(self: Context, mirror: []const u8) ![]const u8 {
+        return std.fs.path.join(self.arena, &.{ self.home, ".zigup", "cache", try std.fmt.allocPrint(self.arena, "{s}.json", .{mirror}) });
     }
 };
 
@@ -50,26 +58,15 @@ pub fn run(cmd: Command, ctx: Context) !void {
         .help => runHelp(),
         .version => std.debug.print("zigup version 0.1.0\n", .{}),
         .env => try runEnv(ctx),
-        .list => try runList(ctx),
-        .show_ziglang => try runShow(ctx, .ziglang),
-        .show_mach => try runShow(ctx, .mach),
-        .install_ziglang => |ver| try runInstall(ctx, ver, .ziglang),
-        .install_mach => |ver| try runInstall(ctx, ver, .mach),
+        .list => |mirror| try runList(ctx, mirror),
+        .install => |ver| try runInstall(ctx, ver),
+        .delete => |ver| try runDelete(ctx, ver),
         .default => |ver| try runDefault(ctx, ver),
-        .delete_ziglang => |ver| try runDelete(ctx, ver),
-        .delete_mach => |ver| try runDelete(ctx, ver),
     }
 }
 
 pub fn parseCommand(args: []const []const u8) ?Command {
-    if (args.len < 2) return null;
-
-    var mirror: ?Mirror = null;
-    for (args[1..]) |arg| {
-        if (std.mem.eql(u8, arg, "--ziglang")) mirror = .ziglang;
-        if (std.mem.eql(u8, arg, "--mach")) mirror = .mach;
-    }
-
+    if (args.len < 2) return .help;
     const cmd = args[1];
 
     if (std.mem.eql(u8, cmd, "help")) return .help;
@@ -77,19 +74,15 @@ pub fn parseCommand(args: []const []const u8) ?Command {
     if (std.mem.eql(u8, cmd, "env")) return .env;
 
     if (std.mem.eql(u8, cmd, "list")) {
-        return switch (mirror orelse return .list) {
-            .ziglang => .show_ziglang,
-            .mach => .show_mach,
-        };
+        if (args.len >= 3) {
+            return Command{ .list = args[2] };
+        }
+        return Command{ .list = "" };
     }
 
     if (std.mem.eql(u8, cmd, "install")) {
         if (args.len < 3) return null;
-        const tag = args[2];
-        return switch (mirror orelse return Command{ .default = tag }) {
-            .ziglang => Command{ .install_ziglang = tag },
-            .mach => Command{ .install_mach = tag },
-        };
+        return Command{ .install = args[2] };
     }
 
     if (std.mem.eql(u8, cmd, "default")) {
@@ -99,21 +92,28 @@ pub fn parseCommand(args: []const []const u8) ?Command {
 
     if (std.mem.eql(u8, cmd, "delete")) {
         if (args.len < 3) return null;
-        const tag = args[2];
-        return switch (mirror orelse .ziglang) {
-            .ziglang => Command{ .delete_ziglang = tag },
-            .mach => Command{ .delete_mach = tag },
-        };
+        return Command{ .delete = args[2] };
     }
 
     return null;
 }
 
 fn runHelp() void {
-    std.debug.print("zigup - Zig Version Manager\n\nCommands:\n", .{});
-    inline for (config.commands) |entry| {
+    std.debug.print(
+        \\Usage:
+        \\  zigup <command> [arguments]
+        \\
+        \\Commands:
+        \\
+    , .{});
+
+    inline for (command.commands) |entry| {
         const usage = if (entry.argLabel) |lbl| entry.verb ++ " " ++ lbl else entry.verb;
-        std.debug.print("  {s:<18} {s}\n", .{ usage, entry.description });
+        std.debug.print("  {s:<20} {s}\n", .{ usage, entry.description });
+        if (std.mem.eql(u8, entry.verb, "install")) {
+            std.debug.print("    --mirror=<name>    Select index mirror configured in config.zon\n", .{});
+            std.debug.print("    --url=<url>        Specify custom JSON index URL directly\n", .{});
+        }
     }
     std.debug.print("\n", .{});
 }
@@ -127,31 +127,11 @@ fn runEnv(ctx: Context) !void {
     }
 }
 
-fn runList(ctx: Context) !void {
-    const zigupDirPath = try ctx.zigupDir();
-    var dir = std.Io.Dir.openDirAbsolute(ctx.io, zigupDirPath, .{ .iterate = true }) catch |err| {
-        std.debug.print("No installed versions found (~/.zigup does not exist): {s}\n", .{@errorName(err)});
+fn syncMirror(ctx: Context, mirror: []const u8) !void {
+    const url = ctx.userConfig.getMirrorUrl(mirror) orelse {
+        std.debug.print("error: mirror '{s}' not defined in config.zon\n", .{mirror});
         return;
     };
-    defer dir.close(ctx.io);
-
-    var count: usize = 0;
-    var it = dir.iterate();
-    while (try it.next(ctx.io)) |entry| {
-        if (entry.kind == .directory and
-            !std.mem.eql(u8, entry.name, "bin") and
-            !std.mem.eql(u8, entry.name, "tmp"))
-        {
-            std.debug.print(" - {s}\n", .{entry.name});
-            count += 1;
-        }
-    }
-
-    if (count == 0) std.debug.print("No installed versions found in ~/.zigup/\n", .{});
-}
-
-fn runShow(ctx: Context, mirror: Mirror) !void {
-    const VersionItem = struct { key: []const u8, date: []const u8 };
 
     var index = Schema.Index.init(ctx.gpa, ctx.io);
     defer index.deinit();
@@ -159,68 +139,128 @@ fn runShow(ctx: Context, mirror: Mirror) !void {
     var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
     defer httpBuf.deinit();
 
-    std.debug.print("Fetching index...\n", .{});
-    if ((try index.fetch(mirror, &httpBuf)) != .ok) {
-        std.debug.print("Failed to fetch index\n", .{});
+    std.debug.print("Syncing index from {s} ({s})...\n", .{ mirror, url });
+    if ((try index.fetchUrl(url, &httpBuf)) != .ok) {
+        std.debug.print("error: failed to fetch index\n", .{});
         return;
     }
 
-    const schema = try Schema.Type.parse(ctx.gpa, httpBuf.written());
-    defer schema.deinit();
+    const cache_path = try ctx.cacheFile(mirror);
+    try Schema.Type.saveCache(ctx.io, cache_path, httpBuf.written());
+}
 
-    var versions = std.ArrayList(VersionItem).empty;
-    defer versions.deinit(ctx.gpa);
-
-    if (mirror == .mach) {
-        var officialIndex = Schema.Index.init(ctx.gpa, ctx.io);
-        defer officialIndex.deinit();
-        var officialBuf = std.Io.Writer.Allocating.init(ctx.gpa);
-        defer officialBuf.deinit();
-
-        if ((try officialIndex.fetch(.ziglang, &officialBuf)) == .ok) {
-            const official = try Schema.Type.parse(ctx.gpa, officialBuf.written());
-            defer official.deinit();
-            var bufKeys: [200][]const u8 = undefined;
-            for (Schema.diff(schema, official, &bufKeys)) |key| {
-                if (schema.parsed.value.map.get(key)) |detail| {
-                    try versions.append(ctx.gpa, .{ .key = key, .date = &detail.date });
-                }
-            }
+fn runList(ctx: Context, mirror_arg: []const u8) !void {
+    const mirror = if (mirror_arg.len > 0) mirror_arg else null;
+    if (mirror) |m| {
+        if (ctx.sync) {
+            try syncMirror(ctx, m);
         }
-    } else {
+
+        const cache_path = try ctx.cacheFile(m);
+        const schema = Schema.Type.loadCache(ctx.gpa, ctx.io, cache_path) catch |err| {
+            std.debug.print("error: failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup list {s} -S') to sync the cache.\n", .{ m, @errorName(err), m });
+            return;
+        };
+        defer schema.deinit();
+
+        const VersionItem = struct { key: []const u8, date: []const u8 };
+        var versions = std.ArrayList(VersionItem).empty;
+        defer versions.deinit(ctx.gpa);
+
         var it = schema.parsed.value.map.iterator();
         while (it.next()) |entry| {
             try versions.append(ctx.gpa, .{ .key = entry.key_ptr.*, .date = &entry.value_ptr.date });
         }
-    }
 
-    std.mem.sort(VersionItem, versions.items, {}, struct {
-        fn lt(_: void, a: VersionItem, b: VersionItem) bool {
-            const ord = std.mem.order(u8, a.date, b.date);
-            if (ord != .eq) return ord == .gt;
-            return std.mem.order(u8, a.key, b.key) == .gt;
+        std.mem.sort(VersionItem, versions.items, {}, struct {
+            fn lt(_: void, a: VersionItem, b: VersionItem) bool {
+                const ord = std.mem.order(u8, a.date, b.date);
+                if (ord != .eq) return ord == .gt;
+                return std.mem.order(u8, a.key, b.key) == .gt;
+            }
+        }.lt);
+
+        for (versions.items) |item| {
+            std.debug.print(" - {s} ({s})\n", .{ item.key, item.date });
         }
-    }.lt);
+    } else {
+        const zigup_dir_path = try ctx.zigupDir();
+        var dir = std.Io.Dir.openDirAbsolute(ctx.io, zigup_dir_path, .{ .iterate = true }) catch |err| {
+            std.debug.print("No installed versions found (~/.zigup does not exist): {s}\n", .{@errorName(err)});
+            return;
+        };
+        defer dir.close(ctx.io);
 
-    for (versions.items) |item| {
-        std.debug.print(" - {s} ({s})\n", .{ item.key, item.date });
+        var count: usize = 0;
+        var it = dir.iterate();
+        while (try it.next(ctx.io)) |entry| {
+            if (entry.kind == .directory and
+                !std.mem.eql(u8, entry.name, "bin") and
+                !std.mem.eql(u8, entry.name, "cache") and
+                !std.mem.eql(u8, entry.name, "tmp"))
+            {
+                std.debug.print(" - {s}\n", .{entry.name});
+                count += 1;
+            }
+        }
+
+        if (count == 0) std.debug.print("No installed versions found in ~/.zigup/\n", .{});
     }
 }
 
-fn runInstall(ctx: Context, ver: []const u8, mirror: Mirror) !void {
-    var index = Schema.Index.init(ctx.gpa, ctx.io);
-    defer index.deinit();
+fn runInstall(ctx: Context, ver: []const u8) !void {
+    var mirror_opt: ?[]const u8 = null;
+    var url_opt: ?[]const u8 = null;
 
-    var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
-    defer httpBuf.deinit();
+    for (ctx.args) |arg| {
+        if (std.mem.startsWith(u8, arg, "--mirror=")) {
+            mirror_opt = arg["--mirror=".len..];
+        } else if (std.mem.startsWith(u8, arg, "--url=")) {
+            url_opt = arg["--url=".len..];
+        }
+    }
 
-    std.debug.print("Fetching index...\n", .{});
-    if ((try index.fetch(mirror, &httpBuf)) != .ok) {
-        std.debug.print("Failed to fetch index\n", .{});
+    if (mirror_opt != null and url_opt != null) {
+        std.debug.print("error: cannot specify both --mirror and --url\n", .{});
         return;
     }
 
-    const schema = try Schema.Type.parse(ctx.gpa, httpBuf.written());
+    const mirror_name = mirror_opt orelse ctx.userConfig.defaultMirror;
+
+    if (ctx.sync and url_opt == null) {
+        try syncMirror(ctx, mirror_name);
+    }
+
+    var index = Schema.Index.init(ctx.gpa, ctx.io);
+    defer index.deinit();
+
+    const schema = blk: {
+        if (url_opt) |u| {
+            var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
+            defer httpBuf.deinit();
+            std.debug.print("Fetching index from {s}...\n", .{u});
+            if ((try index.fetchUrl(u, &httpBuf)) != .ok) {
+                std.debug.print("error: failed to fetch index\n", .{});
+                return;
+            }
+            break :blk try Schema.Type.parse(ctx.gpa, httpBuf.written());
+        } else {
+            const cache_path = try ctx.cacheFile(mirror_name);
+            break :blk Schema.Type.loadCache(ctx.gpa, ctx.io, cache_path) catch |err| {
+                if (ctx.userConfig.getMirrorUrl(mirror_name)) |url| {
+                    var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
+                    defer httpBuf.deinit();
+                    std.debug.print("Cache not found for '{s}'. Fetching from {s}...\n", .{ mirror_name, url });
+                    if ((try index.fetchUrl(url, &httpBuf)) == .ok) {
+                        try Schema.Type.saveCache(ctx.io, cache_path, httpBuf.written());
+                        break :blk try Schema.Type.parse(ctx.gpa, httpBuf.written());
+                    }
+                }
+                std.debug.print("error: failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup install {s} -S') to sync the cache.\n", .{ mirror_name, @errorName(err), ver });
+                return;
+            };
+        }
+    };
     defer schema.deinit();
 
     const platform = Schema.Platform.parse(targetKey()) orelse {
@@ -291,7 +331,7 @@ fn runInstall(ctx: Context, ver: []const u8, mirror: Mirror) !void {
 fn runDefault(ctx: Context, ver: []const u8) !void {
     const installDir = try ctx.versionDir(ver);
     if (!dirExists(ctx, installDir)) {
-        std.debug.print("error: {s} is not installed. Use 'zigup install {s} --ziglang' first.\n", .{ ver, ver });
+        std.debug.print("error: {s} is not installed. Use 'zigup install {s}' first.\n", .{ ver, ver });
         return;
     }
 
