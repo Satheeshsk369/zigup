@@ -20,7 +20,7 @@ pub fn main(init: std.process.Init) !void {
         .arena = arena,
         .io = init.io,
         .home = home,
-        .path_env = init.environ_map.get("PATH") orelse "",
+        .pathEnv = init.environ_map.get("PATH") orelse "",
     };
 
     const cmd = action.parseCommand(args) orelse {
