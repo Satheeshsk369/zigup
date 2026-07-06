@@ -22,8 +22,19 @@ if ($null -eq $rawUserPath) {
 }
 
 # Resolve and clean paths to check if it exists accurately
-$userPathList = $rawUserPath -split ";" | Where-Object { $_ } | ForEach-Object { [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($_)).TrimEnd('\') }
-$resolvedBinDir = [System.IO.Path]::GetFullPath($binDir).TrimEnd('\')
+$userPathList = $rawUserPath -split ";" | Where-Object { $_ } | ForEach-Object {
+    try {
+        $expanded = [Environment]::ExpandEnvironmentVariables($_).Trim().TrimEnd('\')
+        if ($expanded -and [System.IO.Path]::IsPathRooted($expanded)) {
+            [System.IO.Path]::GetFullPath($expanded)
+        } else {
+            $expanded
+        }
+    } catch {
+        $_.Trim().TrimEnd('\')
+    }
+}
+$resolvedBinDir = $binDir.TrimEnd('\')
 
 if ($userPathList -notcontains $resolvedBinDir) {
     $newPath = if ($rawUserPath -eq "") { $binDir } else { $rawUserPath.TrimEnd(';') + ";" + $binDir }
