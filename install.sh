@@ -23,7 +23,7 @@ fi
 RELEASE_JSON=$(curl -sSfL "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest" 2>/dev/null || true)
 TAG=$(echo "$RELEASE_JSON" | grep '"tag_name":' | sed -E 's/.*"tag_name":\s*"(.*)".*/\1/')
 if [ -z "$TAG" ]; then
-  TAG="v0.1.0"
+  TAG="v0.2.0"
 fi
 
 BINARY_NAME="zigup-${ARCH}-${OS}"

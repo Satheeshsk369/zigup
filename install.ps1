@@ -8,7 +8,7 @@ $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
     default { throw "Unsupported architecture: $($env:PROCESSOR_ARCHITECTURE)" }
 }
 
-$tag = "v0.1.0"
+$tag = "v0.2.0"
 try {
     $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest" `
         -Headers @{ "User-Agent" = "zigup-installer" }
