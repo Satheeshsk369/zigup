@@ -15,12 +15,14 @@ pub const A = enum(u2) {
     help,
     version,
     env,
+    update,
 
     pub fn info(self: @This()) []const u8 {
         return switch (self) {
             .help => "Print this message",
             .version => "Print zigup tool version",
             .env => "Print status of ~/.zigup/bin in your PATH",
+            .update => "Update zigup to the latest release version",
         };
     }
 };

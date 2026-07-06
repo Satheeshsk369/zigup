@@ -18,7 +18,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Zig 0.16.0 (Official Nightly)
+      - name: Install Zig 0.16.0
         run: |
           URL=$(curl -s https://ziglang.org/download/index.json | jq -r '.["0.16.0"]."x86_64-linux".tarball')
           curl -L "$URL" -o zig.tar.xz
@@ -33,6 +33,7 @@ jobs:
           for arch in x86 x86_64 aarch64; do
             echo "Building Linux $arch..."
             zig build -Doptimize=ReleaseFast -Dtarget=$arch-linux
+            strip zig-out/bin/zigup
             cp zig-out/bin/zigup dist/zigup-$arch-linux
           done
           
