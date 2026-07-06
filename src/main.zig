@@ -43,7 +43,7 @@ pub fn main(init: std.process.Init) !void {
     };
 
     const cmd = action.parseCommand(final_args) orelse {
-        std.log.err("Unknown command: {s}. Use 'zigup help' for usage details.", .{final_args[1]});
+        std.log.err("Unknown command: {s}.\nUse 'zigup help' for usage details.", .{final_args[1]});
         return;
     };
 

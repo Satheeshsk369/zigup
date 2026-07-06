@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.16.0
+
+      - name: Cross-Compile Binaries
+        run: |
+          mkdir -p dist
+          
+          # Linux Targets
+          for arch in x86 x86_64 aarch64; do
+            echo "Building Linux $arch..."
+            zig build -Doptimize=ReleaseFast -Dtarget=$arch-linux
+            cp zig-out/bin/zigup dist/zigup-$arch-linux
+          done
+          
+          # macOS Targets (No 32-bit x86 support on macOS)
+          for arch in x86_64 aarch64; do
+            echo "Building macOS $arch..."
+            zig build -Doptimize=ReleaseFast -Dtarget=$arch-macos
+            cp zig-out/bin/zigup dist/zigup-$arch-macos
+          done
+          
+          # Windows Targets
+          for arch in x86 x86_64 aarch64; do
+            echo "Building Windows $arch..."
+            zig build -Doptimize=ReleaseFast -Dtarget=$arch-windows
+            cp zig-out/bin/zigup.exe dist/zigup-$arch-windows.exe
+          done
+        shell: bash
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
