@@ -77,7 +77,7 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
   ```bash
   zigup list # list the local installed tags
   zigup list ziglang # list the tags present in ziglang mirror
-  zigup list mach # list the tags present in mach mirror
+  zigup -S list mach # sync the index and list the tags present in mach mirror
   ```
 
 * View the env zigup uses
