@@ -416,7 +416,14 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, filename, .{});
     defer file.close(ctx.io);
 
-    const dlResult = try dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, file, ctx.io);
+    const dlResult = dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, file, ctx.io) catch |err| {
+        if (err == error.ShasumMismatch) {
+            std.log.err("SHA-256 shasum mismatch! The downloaded file is corrupted or tampered with.", .{});
+        } else {
+            std.log.err("failed to download tarball: {s}", .{@errorName(err)});
+        }
+        return;
+    };
     if (dlResult.status != .ok) {
         std.log.err("failed to download tarball. HTTP {s}", .{@tagName(dlResult.status)});
         return;
