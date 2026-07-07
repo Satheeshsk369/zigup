@@ -16,9 +16,12 @@ pub const Downloader = struct {
     pub fn downloadToFile(
         self: *Downloader,
         url: []const u8,
+        shasum: ?[]const u8,
         file: std.Io.File,
         io: std.Io,
     ) !Result {
+        const Sha256 = std.crypto.hash.sha2.Sha256;
+        var hasher = Sha256.init(.{});
         const start = std.Io.Clock.now(.awake, io).nanoseconds;
         const uri = try std.Uri.parse(url);
 
@@ -56,10 +59,12 @@ pub const Downloader = struct {
                 else => |e| return e,
             };
             try writer.interface.writeAll(chunk_buf[0..n]);
+            if (shasum != null) {
+                hasher.update(chunk_buf[0..n]);
+            }
             downloaded += n;
-
             const now = std.Io.Clock.now(.awake, io).nanoseconds;
-            if (now - last_update > 100_000_000) { // 100ms throttle
+            if (now - last_update > 100_000_000) {
                 last_update = now;
                 if (content_length) |total| {
                     const pct = (@as(f64, @floatFromInt(downloaded)) / @as(f64, @floatFromInt(total))) * 100.0;
@@ -76,6 +81,17 @@ pub const Downloader = struct {
         }
 
         try writer.flush();
+
+        if (shasum) |expected| {
+            var digest: [Sha256.digest_length]u8 = undefined;
+            hasher.final(&digest);
+            var actual_hex: [Sha256.digest_length * 2]u8 = undefined;
+            const hex = std.fmt.bytesToHex(digest, .lower);
+            @memcpy(actual_hex[0..], hex[0..]);
+            if (!std.mem.eql(u8, expected, &actual_hex)) {
+                return error.ShasumMismatch;
+            }
+        }
 
         const stop = std.Io.Clock.now(.awake, io).nanoseconds;
         return .{ .status = response.head.status, .duration = stop - start };

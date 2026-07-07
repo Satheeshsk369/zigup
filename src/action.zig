@@ -416,14 +416,15 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, filename, .{});
     defer file.close(ctx.io);
 
-    const dlResult = try dl.Downloader.downloadToFile(&downloader, src.tarball, file, ctx.io);
+    const dlResult = try dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, file, ctx.io);
     if (dlResult.status != .ok) {
         std.log.err("failed to download tarball. HTTP {s}", .{@tagName(dlResult.status)});
         return;
     }
     const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
 
-    std.log.info("Extracting to ~/.zigup/{s}", .{ver});
+    std.log.info("Verified SHA-256 shasum: {s}", .{src.shasum});
+    std.log.info("Extracting to {s}", .{installDir});
     try std.Io.Dir.createDirAbsolute(ctx.io, installDir, .default_dir);
 
     var child = std.process.spawn(ctx.io, .{
@@ -603,7 +604,7 @@ fn runUpdate(ctx: Context) !void {
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, temp_exe_path, .{});
     defer file.close(ctx.io);
 
-    const dlResult = try dl.Downloader.downloadToFile(&downloader, url, file, ctx.io);
+    const dlResult = try dl.Downloader.downloadToFile(&downloader, url, null, file, ctx.io);
     if (dlResult.status != .ok) {
         std.log.err("failed to download update: HTTP {s}", .{@tagName(dlResult.status)});
         return;
