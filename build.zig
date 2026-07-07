@@ -9,6 +9,20 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const version = blk: {
+        const content = @embedFile("build.zig.zon");
+        if (std.mem.indexOf(u8, content, ".version")) |idx| {
+            if (std.mem.indexOfPos(u8, content, idx, "\"")) |start_idx| {
+                if (std.mem.indexOfPos(u8, content, start_idx + 1, "\"")) |end_idx| {
+                    break :blk content[start_idx + 1 .. end_idx];
+                }
+            }
+        }
+        break :blk "0.0.0";
+    };
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", if (version.len > 0) version else "0.0.0");
+
     const exe = b.addExecutable(.{
         .name = "zigup",
         .root_module = b.createModule(.{
@@ -18,6 +32,7 @@ pub fn build(b: *std.Build) void {
             .strip = optimize != .Debug,
             .imports = &.{
                 .{ .name = "adt", .module = adt.module("adt") },
+                .{ .name = "options", .module = options.createModule() },
             },
         }),
     });

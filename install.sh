@@ -20,10 +20,10 @@ if [ "$OS" = "macos" ] && [ "$ARCH" = "x86" ]; then
   echo "macOS 32-bit is unsupported" && exit 1
 fi
 
-RELEASE_JSON=$(curl -sSfL "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest" 2>/dev/null || true)
+RELEASE_JSON=$(curl -sSfL "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest")
 TAG=$(echo "$RELEASE_JSON" | grep '"tag_name":' | sed -E 's/.*"tag_name":\s*"(.*)".*/\1/')
 if [ -z "$TAG" ]; then
-  TAG="v0.2.0"
+  echo "Failed to fetch latest tag from GitHub releases" && exit 1
 fi
 
 BINARY_NAME="zigup-${ARCH}-${OS}"

@@ -5,8 +5,10 @@ $ErrorActionPreference = "Stop"
 
 switch ($env:PROCESSOR_ARCHITECTURE) { "AMD64" { $arch = "x86_64" } "ARM64" { $arch = "aarch64" } "x86" { $arch = "x86" } default { throw "Unsupported architecture: $($env:PROCESSOR_ARCHITECTURE)" } }
 
-$tag = "v0.2.0"
-try { $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest" -Headers @{ "User-Agent" = "zigup-installer" }; if ($rel -is [string]) { $rel = ConvertFrom-Json $rel }; if ($rel.tag_name) { $tag = $rel.tag_name } } catch {}
+$rel = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest" -Headers @{ "User-Agent" = "zigup-installer" }
+if ($rel -is [string]) { $rel = ConvertFrom-Json $rel }
+if (-not $rel.tag_name) { throw "Failed to resolve latest release tag" }
+$tag = $rel.tag_name
 
 $url    = "https://github.com/Satheeshsk369/zigup/releases/download/$tag/zigup-$arch-windows.exe"
 $binDir = Join-Path $env:LOCALAPPDATA "zigup\bin"
