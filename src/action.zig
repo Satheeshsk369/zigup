@@ -280,7 +280,7 @@ fn runList(ctx: Context, mirror_arg: []const u8) !void {
 
         const cache_path = try ctx.cacheFile(m);
         const schema = Schema.Type.loadCache(ctx.gpa, ctx.io, cache_path) catch |err| {
-            std.log.err("failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup list {s} -S') to sync the cache.", .{ m, @errorName(err), m });
+            std.log.err("failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup -S list {s}') to sync the cache.", .{ m, @errorName(err), m });
             return;
         };
         defer schema.deinit();
@@ -303,7 +303,7 @@ fn runList(ctx: Context, mirror_arg: []const u8) !void {
         }.lt);
 
         for (versions.items) |item| {
-            std.debug.print(" - {s} ({s})\n", .{ item.key, item.date });
+            std.debug.print("{s} ({s})\n", .{ item.key, item.date });
         }
     } else {
         const data_dir = try ctx.dataDir();
@@ -321,12 +321,12 @@ fn runList(ctx: Context, mirror_arg: []const u8) !void {
                 !std.mem.eql(u8, entry.name, "cache") and
                 !std.mem.eql(u8, entry.name, "tmp"))
             {
-                std.debug.print(" - {s}\n", .{entry.name});
+                std.debug.print("{s}\n", .{entry.name});
                 count += 1;
             }
         }
 
-        if (count == 0) std.log.info("No installed versions found in ~/.zigup/", .{});
+        if (count == 0) std.log.info("No installed versions found in {s}", .{data_dir});
     }
 }
 
@@ -378,7 +378,7 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
                         break :blk try Schema.Type.parse(ctx.gpa, httpBuf.written());
                     }
                 }
-                std.log.err("failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup install {s} -S') to sync the cache.", .{ mirror_name, @errorName(err), ver });
+                std.log.err("failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup -S install {s}') to sync the cache.", .{ mirror_name, @errorName(err), ver });
                 return;
             };
         }
@@ -416,7 +416,7 @@ fn runInstall(ctx: Context, ver: []const u8) !void {
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, filename, .{});
     defer file.close(ctx.io);
 
-    const dlResult = dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, file, ctx.io) catch |err| {
+    const dlResult = dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, src.size, file, ctx.io) catch |err| {
         if (err == error.ShasumMismatch) {
             std.log.err("SHA-256 shasum mismatch! The downloaded file is corrupted or tampered with.", .{});
         } else {
@@ -611,7 +611,7 @@ fn runUpdate(ctx: Context) !void {
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, temp_exe_path, .{});
     defer file.close(ctx.io);
 
-    const dlResult = try dl.Downloader.downloadToFile(&downloader, url, null, file, ctx.io);
+    const dlResult = try dl.Downloader.downloadToFile(&downloader, url, null, null, file, ctx.io);
     if (dlResult.status != .ok) {
         std.log.err("failed to download update: HTTP {s}", .{@tagName(dlResult.status)});
         return;

@@ -17,6 +17,7 @@ pub const Downloader = struct {
         self: *Downloader,
         url: []const u8,
         shasum: ?[]const u8,
+        size: ?u64,
         file: std.Io.File,
         io: std.Io,
     ) !Result {
@@ -32,7 +33,7 @@ pub const Downloader = struct {
         var redirect_buf: [8192]u8 = undefined;
         var response = try req.receiveHead(&redirect_buf);
 
-        const content_length = response.head.content_length;
+        const content_length = response.head.content_length orelse size;
         var transfer_buf: [64]u8 = undefined;
         var decompress: std.http.Decompress = undefined;
         const decompress_buf: []u8 = switch (response.head.content_encoding) {

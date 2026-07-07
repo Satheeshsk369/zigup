@@ -3,8 +3,6 @@
 
 ## Install
 
-Run the following script to automatically detect your architecture, download the binary, and place it in `~/.local/bin/`
-
 ### Linux & macOS 
 
 ```bash
@@ -41,33 +39,54 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 }
 ```
 
-## Command Examples
+## Usage
 
-* **Sync index and list remote versions**:
+* By default zigup uses the ziglang mirror, you can just download the tag what you want
+
   ```bash
-  zigup -S list ziglang
+  zigup install 0.16.0 # install the 0.16.0 version from ziglang
+  zigup default 0.16.0 # you need to explicitly set the default (otherwise zig binary won't exist on first run)
   ```
-* **Install a version using the default mirror**:
+
+* you can manage the mirror and default mirror in the config.zon, which helps to use that with `--mirror` option.
+
   ```bash
-  zigup install 0.16.0
+  zigup install 0.16.0 --mirror=mach # it shows already exist, even you installed 0.16.0 with other mirror
+  zigup delete 0.16.0 # in that case delete it
+  zigup install 0.16.0 --mirror=mach # install freshly from the new mirror, if you want so.
+  zigup default 0.16.0 # default won't affect unless you want a different tag
   ```
-* **Install the latest master/nightly version**:
+
+* use the `--url` option, if you don't want to touch the config.zon
+
   ```bash
-  zigup -S install master
-  ```
-* **Install from a specific mirror**:
-  ```bash
-  zigup -S install 2026.6.18-mach --mirror=mach
-  ```
-* **Set version as the active default**:
-  ```bash
+  zigup delete 0.16.0 # delete existed installation
+  zigup install 0.16.0 --url="https://pkg.hexops.org/zig/index.json"
   zigup default 0.16.0
   ```
-* **Delete an installed version**:
+
+* zigup use the cache the json index, if you are working with master always use `-S` for sync
+
   ```bash
-  zigup delete 0.15.2
+  zigup -S install master # This will first update the json, Then download the zig version
+  zigup -S install master --mirror=mach 
   ```
-* **Update zigup itself**:
+
+* You can list the tags
+
+  ```bash
+  zigup list # list the local installed tags
+  zigup list ziglang # list the tags present in ziglang mirror
+  zigup list mach # list the tags present in mach mirror
+  ```
+
+* View the env zigup uses
+  ```bash
+  zigup env # show what are the directly uses for what purpose
+  ```
+
+* Self update the zigup
+
   ```bash
   zigup update
   ```
