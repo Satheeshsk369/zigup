@@ -160,3 +160,8 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, download_path) catch {};
     std.log.info("Successfully installed {s} in {d:.2}s.", .{ ver, dl_secs });
 }
+
+test "install action structures compilation check" {
+    // Assert type structure compiles
+    _ = run;
+}

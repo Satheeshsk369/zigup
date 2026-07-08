@@ -82,3 +82,32 @@ pub fn run(ctx: action.Context, mirror_arg: []const u8) !void {
         if (count == 0) std.log.info("No installed versions found in {s}", .{data_dir});
     }
 }
+
+test "list action mock execution" {
+    var env_map = std.process.Environ.Map.init(std.testing.allocator);
+    defer env_map.deinit();
+    try env_map.put("HOME", "/tmp/zigup-list-home");
+
+    const config_zon =
+        \\.{
+        \\    .mirrors = .{},
+        \\    .defaultMirror = "ziglang",
+        \\}
+    ;
+    var parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
+    defer parsed.deinit(std.testing.allocator);
+
+    const ctx = action.Context{
+        .gpa = std.testing.allocator,
+        .arena = std.testing.allocator,
+        .io = undefined,
+        .environMap = &env_map,
+        .pathEnv = "/usr/bin:/bin",
+        .userConfig = parsed.value,
+        .args = &.{},
+        .sync = false,
+    };
+
+    // Assert that listing local installations handles a nonexistent data folder cleanly
+    try run(ctx, "");
+}

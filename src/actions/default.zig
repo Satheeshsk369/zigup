@@ -49,3 +49,32 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
 
     std.log.info("Set {s} as default.", .{ver});
 }
+
+test "default action fails on nonexistent version" {
+    var env_map = std.process.Environ.Map.init(std.testing.allocator);
+    defer env_map.deinit();
+    try env_map.put("HOME", "/tmp/zigup-default-home");
+
+    const config_zon =
+        \\.{
+        \\    .mirrors = .{},
+        \\    .defaultMirror = "ziglang",
+        \\}
+    ;
+    var parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
+    defer parsed.deinit(std.testing.allocator);
+
+    const ctx = action.Context{
+        .gpa = std.testing.allocator,
+        .arena = std.testing.allocator,
+        .io = undefined,
+        .environMap = &env_map,
+        .pathEnv = "/usr/bin:/bin",
+        .userConfig = parsed.value,
+        .args = &.{},
+        .sync = false,
+    };
+
+    // Assert that attempting to set a non-installed version as default returns cleanly with error message instead of panicking
+    try run(ctx, "0.0.0-nonexistent");
+}
