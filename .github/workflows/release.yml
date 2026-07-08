@@ -59,7 +59,7 @@ jobs:
         shell: bash
 
       - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.2.1
         with:
           files: dist/*
         env:
