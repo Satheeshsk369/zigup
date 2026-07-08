@@ -22,7 +22,6 @@ pub fn run() void {
 }
 
 test "help action properties" {
-    // Assert that the command database contains our primary commands and descriptions
     var has_install = false;
     var has_default = false;
     for (command.commands) |entry| {

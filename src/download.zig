@@ -1,6 +1,20 @@
 const std = @import("std");
 const Client = std.http.Client;
 
+fn printProgress(io: std.Io, comptime format: []const u8, args: anytype) void {
+    const stderr = std.Io.File.stderr();
+    const ls = io.lockStderr(&.{}, null) catch {
+        var buf: [256]u8 = undefined;
+        const msg = std.fmt.bufPrint(&buf, format, args) catch return;
+        stderr.writeStreamingAll(io, msg) catch {};
+        return;
+    };
+    defer io.unlockStderr();
+
+    const t = ls.terminal();
+    t.writer.print(format, args) catch {};
+}
+
 pub const Downloader = struct {
     client: *Client,
 
@@ -69,16 +83,16 @@ pub const Downloader = struct {
                 last_update = now;
                 if (content_length) |total| {
                     const pct = (@as(f64, @floatFromInt(downloaded)) / @as(f64, @floatFromInt(total))) * 100.0;
-                    std.log.info("\rDownloading... {d:.1}% ({d} / {d} bytes)", .{ pct, downloaded, total });
+                    printProgress(io, "\rDownloading... {d:.1}% ({d} / {d} bytes)", .{ pct, downloaded, total });
                 } else {
-                    std.log.info("\rDownloading... {d} bytes", .{downloaded});
+                    printProgress(io, "\rDownloading... {d} bytes", .{downloaded});
                 }
             }
         }
         if (content_length) |total| {
-            std.log.info("\rDownloading... 100.0% ({d} / {d} bytes)\n", .{ total, total });
+            printProgress(io, "\rDownloading... 100.0% ({d} / {d} bytes)\n", .{ total, total });
         } else {
-            std.log.info("\rDownloading... {d} bytes\n", .{downloaded});
+            printProgress(io, "\rDownloading... {d} bytes\n", .{downloaded});
         }
 
         try writer.flush();
