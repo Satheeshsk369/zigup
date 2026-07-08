@@ -18,19 +18,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Cache Zig compiler installations
-        uses: actions/cache@v6
-        with:
-          path: ~/.local/share/zig
-          key: ${{ runner.os }}-zig-0.16.0
-
-      - name: Install zigup and Zig 0.16.0
+      - name: Install Zig 0.16.0
         run: |
-          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          export PATH="$HOME/.local/bin:$PATH"
-          zigup install 0.16.0
-          zigup default 0.16.0
+          URL=$(curl -s https://ziglang.org/download/index.json | jq -r '.["0.16.0"]."x86_64-linux".tarball')
+          curl -L "$URL" -o zig.tar.xz
+          tar -xf zig.tar.xz --strip-components=1
+          echo "$GITHUB_WORKSPACE" >> $GITHUB_PATH
         shell: bash
       - name: Cross-Compile Binaries
         run: |
@@ -58,7 +51,7 @@ jobs:
         shell: bash
 
       - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v2.2.1
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*
         env:
