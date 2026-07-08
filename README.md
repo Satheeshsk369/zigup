@@ -90,3 +90,24 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
   ```bash
   zigup update
   ```
+
+## GitHub Actions CI/CD Usage
+
+You can use `zigup` to manage and cache the Zig compiler in your GitHub Actions workflows:
+
+```yaml
+      - name: Cache Zig compiler installations
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/zig
+          key: ${{ runner.os }}-zig-0.16.0
+
+      - name: Install latest zigup and Zig 0.16.0
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          zigup install 0.16.0
+          zigup default 0.16.0
+        shell: bash
+```

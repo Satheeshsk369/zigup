@@ -24,9 +24,11 @@ jobs:
           path: ~/.local/share/zig
           key: ${{ runner.os }}-zig-0.16.0
 
-      - name: Install latest zigup and Zig 0.16.0
+      - name: Install zigup v0.2.2 and Zig 0.16.0
         run: |
-          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/Satheeshsk369/zigup/releases/download/v0.2.2/zigup-x86_64-linux -o "$HOME/.local/bin/zigup"
+          chmod +x "$HOME/.local/bin/zigup"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           export PATH="$HOME/.local/bin:$PATH"
           zigup install 0.16.0
