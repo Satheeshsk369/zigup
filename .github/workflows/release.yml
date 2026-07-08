@@ -19,7 +19,7 @@ jobs:
           submodules: recursive
 
       - name: Cache Zig compiler installations
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.local/share/zig
           key: ${{ runner.os }}-zig-0.16.0

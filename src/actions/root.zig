@@ -80,6 +80,7 @@ pub const Context = struct {
 
     pub fn cacheFile(self: Context, mirror: []const u8) ![]const u8 {
         const base = try self.resolvePath(.cache);
+        try makeDirRecursive(self.io, self.arena, base);
         const filename = try std.fmt.allocPrint(self.arena, "{s}.json", .{mirror});
         return std.fs.path.join(self.arena, &.{ base, filename });
     }
