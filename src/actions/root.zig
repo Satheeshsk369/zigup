@@ -1,0 +1,305 @@
+const std = @import("std");
+const Schema = @import("../schema.zig");
+const command = @import("../command.zig");
+const config = @import("../config.zig");
+
+pub const Command = command.Command;
+pub const Mirror = Schema.Index.Mirror;
+
+pub const Folder = enum { config, cache, data, bin };
+
+pub fn getPlatformPath(comptime folder: Folder) []const []const u8 {
+    const builtin = @import("builtin");
+    return switch (builtin.os.tag) {
+        .windows => switch (folder) {
+            .config => &.{ "APPDATA", "zigup", "config.zon" },
+            .cache => &.{ "LOCALAPPDATA", "zigup", "cache" },
+            .data => &.{ "LOCALAPPDATA", "zigup" },
+            .bin => &.{ "LOCALAPPDATA", "zigup", "bin" },
+        },
+        else => switch (folder) {
+            .config => &.{ "XDG_CONFIG_HOME", ".config", "zigup", "config.zon" },
+            .cache => &.{ "XDG_CACHE_HOME", ".cache", "zigup" },
+            .data => &.{ "XDG_DATA_HOME", ".local", "share", "zig" },
+            .bin => &.{ "HOME", ".local", "bin" },
+        },
+    };
+}
+
+pub const Context = struct {
+    gpa: std.mem.Allocator,
+    arena: std.mem.Allocator,
+    io: std.Io,
+    environMap: *const std.process.Environ.Map,
+    pathEnv: []const u8,
+    userConfig: config.Config,
+    args: []const []const u8,
+    sync: bool,
+
+    fn resolvePath(self: Context, comptime folder: Folder) ![]const u8 {
+        const parts = getPlatformPath(folder);
+        const env_name = parts[0];
+
+        var base_dir: []const u8 = undefined;
+        var static_parts: []const []const u8 = undefined;
+
+        if (self.environMap.get(env_name)) |val| {
+            base_dir = val;
+            static_parts = if (std.mem.startsWith(u8, env_name, "XDG_")) parts[2..] else parts[1..];
+        } else {
+            if (std.mem.startsWith(u8, env_name, "XDG_")) {
+                const home = self.environMap.get("HOME") orelse return error.HomeNotFound;
+                base_dir = try std.fs.path.join(self.arena, &.{ home, parts[1] });
+                static_parts = parts[2..];
+            } else {
+                const builtin = @import("builtin");
+                if (builtin.os.tag == .windows) {
+                    const userprofile = self.environMap.get("USERPROFILE") orelse self.environMap.get("HOME") orelse return error.HomeNotFound;
+                    if (std.mem.eql(u8, env_name, "LOCALAPPDATA")) {
+                        base_dir = try std.fs.path.join(self.arena, &.{ userprofile, "AppData", "Local" });
+                        static_parts = parts[1..];
+                    } else if (std.mem.eql(u8, env_name, "APPDATA")) {
+                        base_dir = try std.fs.path.join(self.arena, &.{ userprofile, "AppData", "Roaming" });
+                        static_parts = parts[1..];
+                    } else {
+                        return error.EnvironmentVariableNotFound;
+                    }
+                } else {
+                    return error.EnvironmentVariableNotFound;
+                }
+            }
+        }
+
+        if (static_parts.len == 0) return base_dir;
+
+        var list = std.ArrayList([]const u8).empty;
+        try list.append(self.arena, base_dir);
+        try list.appendSlice(self.arena, static_parts);
+        return std.fs.path.join(self.arena, list.items);
+    }
+
+    pub fn cacheFile(self: Context, mirror: []const u8) ![]const u8 {
+        const base = try self.resolvePath(.cache);
+        const filename = try std.fmt.allocPrint(self.arena, "{s}.json", .{mirror});
+        return std.fs.path.join(self.arena, &.{ base, filename });
+    }
+
+    pub fn dataDir(self: Context) ![]const u8 {
+        return self.resolvePath(.data);
+    }
+
+    pub fn versionDir(self: Context, ver: []const u8) ![]const u8 {
+        return std.fs.path.join(self.arena, &.{ try self.dataDir(), ver });
+    }
+
+    pub fn binDir(self: Context) ![]const u8 {
+        return self.resolvePath(.bin);
+    }
+
+    pub fn configDir(self: Context) ![]const u8 {
+        const path = try configPath(self.arena, self.environMap);
+        return std.fs.path.dirname(path) orelse path;
+    }
+
+    pub fn cacheDir(self: Context) ![]const u8 {
+        return self.resolvePath(.cache);
+    }
+};
+
+pub fn configPath(arena: std.mem.Allocator, environMap: *const std.process.Environ.Map) ![]const u8 {
+    const parts = getPlatformPath(.config);
+    const env_name = parts[0];
+    const env_val = environMap.get(env_name) orelse {
+        if (std.mem.startsWith(u8, env_name, "XDG_")) {
+            const home = environMap.get("HOME") orelse return error.HomeNotFound;
+            const fallback_base = try std.fs.path.join(arena, &.{ home, parts[1] });
+            return try std.fs.path.join(arena, &.{ fallback_base, parts[2], parts[3] });
+        }
+        const builtin = @import("builtin");
+        if (builtin.os.tag == .windows) {
+            const userprofile = environMap.get("USERPROFILE") orelse environMap.get("HOME") orelse return error.HomeNotFound;
+            if (std.mem.eql(u8, env_name, "APPDATA")) {
+                const fallback_base = try std.fs.path.join(arena, &.{ userprofile, "AppData", "Roaming" });
+                return try std.fs.path.join(arena, &.{ fallback_base, parts[1], parts[2] });
+            }
+        }
+        return error.EnvironmentVariableNotFound;
+    };
+
+    const static_parts = if (std.mem.startsWith(u8, env_name, "XDG_")) parts[2..] else parts[1..];
+    if (static_parts.len == 0) return env_val;
+
+    var list = std.ArrayList([]const u8).empty;
+    try list.append(arena, env_val);
+    try list.appendSlice(arena, static_parts);
+    return std.fs.path.join(arena, list.items);
+}
+
+pub fn targetKey() []const u8 {
+    const builtin = @import("builtin");
+    return @tagName(builtin.target.cpu.arch) ++ "-" ++ @tagName(builtin.target.os.tag);
+}
+
+pub fn dirExists(ctx: Context, path: []const u8) bool {
+    if (std.Io.Dir.openDirAbsolute(ctx.io, path, .{})) |*d| {
+        d.close(ctx.io);
+        return true;
+    } else |_| return false;
+}
+
+pub fn makeDirRecursive(io: std.Io, allocator: std.mem.Allocator, path: []const u8) !void {
+    var parts = std.mem.tokenizeAny(u8, path, "/\\");
+    var buffer = std.ArrayList(u8).empty;
+    defer buffer.deinit(allocator);
+
+    const builtin = @import("builtin");
+    const is_windows = builtin.os.tag == .windows;
+
+    if (!is_windows and path.len > 0 and path[0] == '/') {
+        try buffer.append(allocator, '/');
+    }
+
+    while (parts.next()) |part| {
+        if (buffer.items.len > 0 and buffer.items[buffer.items.len - 1] != '/' and buffer.items[buffer.items.len - 1] != '\\') {
+            const sep: u8 = if (is_windows) '\\' else '/';
+            try buffer.append(allocator, sep);
+        }
+        try buffer.appendSlice(allocator, part);
+
+        std.Io.Dir.createDirAbsolute(io, buffer.items, .default_dir) catch |err| switch (err) {
+            error.PathAlreadyExists => {},
+            else => return err,
+        };
+    }
+}
+
+pub fn run(cmd: Command, ctx: Context) !void {
+    switch (cmd) {
+        .help => @import("help.zig").run(),
+        .version => std.debug.print("{s}\n", .{@import("options").version}),
+        .env => try @import("env.zig").run(ctx),
+        .list => |mirror| try @import("list.zig").run(ctx, mirror),
+        .install => |ver| try @import("install.zig").run(ctx, ver),
+        .delete => |ver| try @import("delete.zig").run(ctx, ver),
+        .default => |ver| try @import("default.zig").run(ctx, ver),
+        .update => try @import("update.zig").run(ctx),
+    }
+}
+
+pub fn parseCommand(args: []const []const u8) ?Command {
+    if (args.len < 2) return .help;
+    const cmd = args[1];
+
+    if (std.mem.eql(u8, cmd, "help")) return .help;
+    if (std.mem.eql(u8, cmd, "version")) return .version;
+    if (std.mem.eql(u8, cmd, "env")) return .env;
+    if (std.mem.eql(u8, cmd, "update")) return .update;
+    if (std.mem.eql(u8, cmd, "install")) {
+        if (args.len < 3) {
+            std.log.err("command 'install' requires a version tag", .{});
+            return .help;
+        }
+        return Command{ .install = args[2] };
+    }
+
+    if (std.mem.eql(u8, cmd, "default")) {
+        if (args.len < 3) {
+            std.log.err("command 'default' requires a version tag", .{});
+            return .help;
+        }
+        return Command{ .default = args[2] };
+    }
+
+    if (std.mem.eql(u8, cmd, "delete")) {
+        if (args.len < 3) {
+            std.log.err("command 'delete' requires a version tag", .{});
+            return .help;
+        }
+        return Command{ .delete = args[2] };
+    }
+
+    if (std.mem.eql(u8, cmd, "list")) {
+        if (args.len >= 3) {
+            return Command{ .list = args[2] };
+        }
+        return Command{ .list = "" };
+    }
+
+    return null;
+}
+
+pub fn extractZipStrip(io: std.Io, dest: std.Io.Dir, fr: *std.Io.File.Reader) !void {
+    var iter = try std.zip.Iterator.init(fr);
+    var filename_buf: [std.fs.max_path_bytes]u8 = undefined;
+
+    while (try iter.next()) |entry| {
+        if (filename_buf.len < entry.filename_len)
+            return error.ZipInsufficientBuffer;
+
+        const filename = filename_buf[0..entry.filename_len];
+        {
+            try fr.seekTo(entry.header_zip_offset + @sizeOf(std.zip.CentralDirectoryFileHeader));
+            try fr.interface.readSliceAll(filename);
+        }
+
+        std.mem.replaceScalar(u8, filename, '\\', '/');
+
+        const slash_idx = std.mem.indexOfScalar(u8, filename, '/') orelse continue;
+        const stripped_filename = filename[slash_idx + 1 ..];
+        if (stripped_filename.len == 0) continue;
+
+        const local_data_header_offset: u64 = local_data_header_offset: {
+            const local_header = blk: {
+                try fr.seekTo(entry.file_offset);
+                break :blk try fr.interface.takeStruct(std.zip.LocalFileHeader, .little);
+            };
+            if (!std.mem.eql(u8, &local_header.signature, &std.zip.local_file_header_sig))
+                return error.ZipBadFileOffset;
+            if (local_header.version_needed_to_extract != entry.version_needed_to_extract)
+                return error.ZipMismatchVersionNeeded;
+            if (local_header.last_modification_time != entry.last_modification_time)
+                return error.ZipMismatchModTime;
+            if (local_header.last_modification_date != entry.last_modification_date)
+                return error.ZipMismatchModDate;
+
+            break :local_data_header_offset @as(u64, local_header.filename_len) +
+                @as(u64, local_header.extra_len);
+        };
+
+        const data_offset = entry.file_offset + @sizeOf(std.zip.LocalFileHeader) + local_data_header_offset;
+
+        if (filename[filename.len - 1] == '/') {
+            try dest.createDirPath(io, stripped_filename[0 .. stripped_filename.len - 1]);
+            continue;
+        }
+
+        const out_file = blk: {
+            if (std.fs.path.dirname(stripped_filename)) |dirname| {
+                var parent_dir = try dest.createDirPathOpen(io, dirname, .{});
+                defer parent_dir.close(io);
+                break :blk try parent_dir.createFile(io, std.fs.path.basename(stripped_filename), .{});
+            } else {
+                break :blk try dest.createFile(io, stripped_filename, .{});
+            }
+        };
+        defer out_file.close(io);
+
+        try fr.seekTo(data_offset);
+
+        switch (entry.compression_method) {
+            .store => {
+                var w = out_file.writer(io, &.{});
+                try fr.interface.streamExact64(&w.interface, entry.uncompressed_size);
+            },
+            .deflate => {
+                const decompress_buf = try std.heap.page_allocator.alloc(u8, std.compress.flate.max_window_len);
+                defer std.heap.page_allocator.free(decompress_buf);
+
+                var decompressor = std.compress.flate.Decompress.init(&fr.interface, .raw, decompress_buf);
+                var out_writer = out_file.writer(io, &.{});
+                try decompressor.reader.streamExact64(&out_writer.interface, entry.uncompressed_size);
+            },
+            _ => return error.UnsupportedCompressionMethod,
+        }
+    }
+}

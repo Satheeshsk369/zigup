@@ -1,5 +1,5 @@
 const std = @import("std");
-const action = @import("action.zig");
+const action = @import("actions/root.zig");
 const config = @import("config.zig");
 
 var global_io: std.Io = undefined;
