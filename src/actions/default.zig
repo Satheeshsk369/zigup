@@ -9,7 +9,7 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     }
 
     const binDir = try ctx.binDir();
-    try action.makeDirRecursive(ctx.io, ctx.arena, binDir);
+    try action.ensureDir(ctx.io, binDir);
 
     const builtin = @import("builtin");
     if (comptime builtin.os.tag == .windows) {

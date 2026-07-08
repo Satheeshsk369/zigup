@@ -30,28 +30,10 @@ pub const Config = struct {
         const file = std.Io.Dir.openFileAbsolute(io, path, .{}) catch |err| switch (err) {
             error.FileNotFound => {
                 if (std.fs.path.dirname(path)) |dir_path| {
-                    var parts = std.mem.tokenizeAny(u8, dir_path, "/\\");
-                    var buffer = std.ArrayList(u8).empty;
-                    defer buffer.deinit(gpa);
-
-                    const builtin = @import("builtin");
-                    const is_windows = builtin.os.tag == .windows;
-
-                    if (!is_windows and dir_path.len > 0 and dir_path[0] == '/') {
-                        try buffer.append(gpa, '/');
-                    }
-
-                    while (parts.next()) |part| {
-                        if (buffer.items.len > 0 and buffer.items[buffer.items.len - 1] != '/' and buffer.items[buffer.items.len - 1] != '\\') {
-                            const sep: u8 = if (is_windows) '\\' else '/';
-                            try buffer.append(gpa, sep);
-                        }
-                        try buffer.appendSlice(gpa, part);
-                        std.Io.Dir.createDirAbsolute(io, buffer.items, .default_dir) catch |e| switch (e) {
-                            error.PathAlreadyExists => {},
-                            else => return e,
-                        };
-                    }
+                    std.Io.Dir.createDirAbsolute(io, dir_path, .default_dir) catch |e| switch (e) {
+                        error.PathAlreadyExists => {},
+                        else => return e,
+                    };
                 }
                 var f = try std.Io.Dir.createFileAbsolute(io, path, .{});
                 defer f.close(io);

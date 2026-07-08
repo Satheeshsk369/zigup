@@ -90,30 +90,12 @@ pub const Type = struct {
     }
 
     pub fn saveCache(allocator: std.mem.Allocator, io: std.Io, path: []const u8, content: []const u8) !void {
+        _ = allocator;
         if (std.fs.path.dirname(path)) |dir| {
-            var parts = std.mem.tokenizeAny(u8, dir, "/\\");
-            var buffer = std.ArrayList(u8).empty;
-            defer buffer.deinit(allocator);
-
-            const builtin = @import("builtin");
-            const is_windows = builtin.os.tag == .windows;
-
-            if (!is_windows and dir.len > 0 and dir[0] == '/') {
-                try buffer.append(allocator, '/');
-            }
-
-            while (parts.next()) |part| {
-                if (buffer.items.len > 0 and buffer.items[buffer.items.len - 1] != '/' and buffer.items[buffer.items.len - 1] != '\\') {
-                    const sep: u8 = if (is_windows) '\\' else '/';
-                    try buffer.append(allocator, sep);
-                }
-                try buffer.appendSlice(allocator, part);
-
-                std.Io.Dir.createDirAbsolute(io, buffer.items, .default_dir) catch |err| switch (err) {
-                    error.PathAlreadyExists => {},
-                    else => return err,
-                };
-            }
+            std.Io.Dir.createDirAbsolute(io, dir, .default_dir) catch |e| switch (e) {
+                error.PathAlreadyExists => {},
+                else => return e,
+            };
         }
         var file = try std.Io.Dir.createFileAbsolute(io, path, .{});
         defer file.close(io);

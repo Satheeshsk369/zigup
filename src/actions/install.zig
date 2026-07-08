@@ -94,8 +94,8 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     const binDir = try ctx.binDir();
     const installDir = try ctx.versionDir(ver);
 
-    try action.makeDirRecursive(ctx.io, ctx.arena, dataDir);
-    try action.makeDirRecursive(ctx.io, ctx.arena, binDir);
+    try action.ensureDir(ctx.io, dataDir);
+    try action.ensureDir(ctx.io, binDir);
 
     if (action.dirExists(ctx, installDir)) {
         std.log.info("Version {s} is already installed.", .{ver});
@@ -128,7 +128,7 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
 
     std.log.info("Verified SHA-256 shasum: {s}", .{src.shasum});
-    try action.makeDirRecursive(ctx.io, ctx.arena, installDir);
+    try action.ensureDir(ctx.io, installDir);
     const is_zip = std.mem.endsWith(u8, filename, ".zip");
 
     var archive_file = try std.Io.Dir.openFileAbsolute(ctx.io, download_path, .{});

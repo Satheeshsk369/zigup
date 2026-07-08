@@ -80,7 +80,7 @@ pub const Context = struct {
 
     pub fn cacheFile(self: Context, mirror: []const u8) ![]const u8 {
         const base = try self.resolvePath(.cache);
-        try makeDirRecursive(self.io, self.arena, base);
+        try ensureDir(self.io, base);
         const filename = try std.fmt.allocPrint(self.arena, "{s}.json", .{mirror});
         return std.fs.path.join(self.arena, &.{ base, filename });
     }
@@ -148,30 +148,14 @@ pub fn dirExists(ctx: Context, path: []const u8) bool {
     } else |_| return false;
 }
 
-pub fn makeDirRecursive(io: std.Io, allocator: std.mem.Allocator, path: []const u8) !void {
-    var parts = std.mem.tokenizeAny(u8, path, "/\\");
-    var buffer = std.ArrayList(u8).empty;
-    defer buffer.deinit(allocator);
-
-    const builtin = @import("builtin");
-    const is_windows = builtin.os.tag == .windows;
-
-    if (!is_windows and path.len > 0 and path[0] == '/') {
-        try buffer.append(allocator, '/');
-    }
-
-    while (parts.next()) |part| {
-        if (buffer.items.len > 0 and buffer.items[buffer.items.len - 1] != '/' and buffer.items[buffer.items.len - 1] != '\\') {
-            const sep: u8 = if (is_windows) '\\' else '/';
-            try buffer.append(allocator, sep);
-        }
-        try buffer.appendSlice(allocator, part);
-
-        std.Io.Dir.createDirAbsolute(io, buffer.items, .default_dir) catch |err| switch (err) {
-            error.PathAlreadyExists => {},
-            else => return err,
-        };
-    }
+pub fn ensureDir(io: std.Io, path: []const u8) !void {
+    std.Io.Dir.createDirAbsolute(io, path, .default_dir) catch |e| switch (e) {
+        error.PathAlreadyExists => {},
+        else => {
+            std.log.err("directory '{s}' missing: {s}", .{ path, @errorName(e) });
+            return e;
+        },
+    };
 }
 
 pub fn run(cmd: Command, ctx: Context) !void {

@@ -26,7 +26,6 @@ jobs:
 
       - name: Install zigup and Zig 0.16.0
         run: |
-          mkdir -p "$HOME/.local/bin"
           curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           export PATH="$HOME/.local/bin:$PATH"

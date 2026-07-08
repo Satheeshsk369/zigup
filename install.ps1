@@ -27,10 +27,14 @@ if (-not $tag) { throw "Failed to find a release tag with compiled binary: $bina
 
 $url    = "https://github.com/Satheeshsk369/zigup/releases/download/$tag/$binaryName"
 
-$binDir = Join-Path $env:LOCALAPPDATA "zigup\bin"
-$dest   = Join-Path $binDir "zigup.exe"
+$binDir    = Join-Path $env:LOCALAPPDATA "zigup\bin"
+$configDir = Join-Path $env:APPDATA "zigup"
+$cacheDir  = Join-Path $env:LOCALAPPDATA "zigup\cache"
+$dest      = Join-Path $binDir "zigup.exe"
 
 New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
 Write-Host "Downloading zigup $tag ($arch)..."
 Invoke-WebRequest -Uri $url -OutFile $dest
 
