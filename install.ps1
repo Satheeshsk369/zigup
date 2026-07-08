@@ -5,12 +5,28 @@ $ErrorActionPreference = "Stop"
 
 switch ($env:PROCESSOR_ARCHITECTURE) { "AMD64" { $arch = "x86_64" } "ARM64" { $arch = "aarch64" } "x86" { $arch = "x86" } default { throw "Unsupported architecture: $($env:PROCESSOR_ARCHITECTURE)" } }
 
-$rel = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases/latest" -Headers @{ "User-Agent" = "zigup-installer" }
-if ($rel -is [string]) { $rel = ConvertFrom-Json $rel }
-if (-not $rel.tag_name) { throw "Failed to resolve latest release tag" }
-$tag = $rel.tag_name
+$releases = Invoke-RestMethod -Uri "https://api.github.com/repos/Satheeshsk369/zigup/releases" -Headers @{ "User-Agent" = "zigup-installer" }
+if ($releases -is [string]) { $releases = ConvertFrom-Json $releases }
 
-$url    = "https://github.com/Satheeshsk369/zigup/releases/download/$tag/zigup-$arch-windows.exe"
+$tag = $null
+$binaryName = "zigup-$arch-windows.exe"
+
+foreach ($rel in $releases) {
+    if ($null -ne $rel.assets) {
+        foreach ($asset in $rel.assets) {
+            if ($asset.name -eq $binaryName) {
+                $tag = $rel.tag_name
+                break
+            }
+        }
+    }
+    if ($null -ne $tag) { break }
+}
+
+if (-not $tag) { throw "Failed to find a release tag with compiled binary: $binaryName" }
+
+$url    = "https://github.com/Satheeshsk369/zigup/releases/download/$tag/$binaryName"
+
 $binDir = Join-Path $env:LOCALAPPDATA "zigup\bin"
 $dest   = Join-Path $binDir "zigup.exe"
 
@@ -23,7 +39,6 @@ if ($null -eq $rawUserPath) {
     $rawUserPath = ""
 }
 
-# Resolve and clean paths to check if it exists accurately
 $userPathList = $rawUserPath -split ";" | Where-Object { $_ } | ForEach-Object {
     $pathItem = $_
     try {
@@ -44,7 +59,6 @@ if ($userPathList -notcontains $resolvedBinDir) {
     [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
     $env:PATH += ";$binDir"
     
-    # Notify Windows that environment variables have changed
     $signature = '[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
     $type = Add-Type -MemberDefinition $signature -Name "Win32SendMessage" -Namespace "Win32" -PassThru
     $result = [UIntPtr]::Zero
