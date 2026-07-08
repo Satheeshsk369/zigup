@@ -52,8 +52,12 @@ pub fn run(ctx: action.Context) !void {
 
     const release = release_parsed.value;
 
-    const current_ver = "v0.1.0";
-    if (std.mem.eql(u8, release.tag_name, current_ver)) {
+    const current_ver = @import("options").version;
+    var release_tag = release.tag_name;
+    if (std.mem.startsWith(u8, release_tag, "v")) {
+        release_tag = release_tag[1..];
+    }
+    if (std.mem.eql(u8, release_tag, current_ver)) {
         std.log.info("zigup is already up to date ({s}).", .{current_ver});
         return;
     }
