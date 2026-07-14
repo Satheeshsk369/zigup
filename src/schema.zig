@@ -13,7 +13,10 @@ pub const Index = struct {
     pub fn init(gpa: std.mem.Allocator, io: std.Io, environ_map: *const std.process.Environ.Map) Self {
         var client = Client{ .allocator = gpa, .io = io };
         client.initDefaultProxies(gpa, environ_map) catch {};
-        client.now = std.Io.Clock.real.now(io);
+        const builtin = @import("builtin");
+        if (builtin.os.tag == .windows) {
+            client.now = std.Io.Clock.real.now(io);
+        }
         return Self{ .client = client };
     }
 
