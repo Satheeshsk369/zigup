@@ -19,14 +19,20 @@ jobs:
 
     steps:
       - name: Install zigup
-        run: curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
-
-      - name: Install and verify master Zig
         run: |
-          $HOME/.local/bin/zigup install master
-          $HOME/.local/bin/zigup default master
-          $HOME/.local/bin/zigup list
-          $HOME/.local/bin/zig version
+          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install master Zig
+        run: zigup install master
+
+      - name: Set master as default
+        run: zigup default master
+
+      - name: Verify
+        run: |
+          zigup list
+          zig version
 
   test-windows:
     name: Windows x86_64
@@ -38,12 +44,18 @@ jobs:
         run: |
           $script = (Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1).Content
           Invoke-Expression $script
+          "$env:LOCALAPPDATA\zigup\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install and verify master Zig
+      - name: Install master Zig
+        shell: pwsh
+        run: zigup install master
+
+      - name: Set master as default
+        shell: pwsh
+        run: zigup default master
+
+      - name: Verify
         shell: pwsh
         run: |
-          $env:PATH = "$env:LOCALAPPDATA\zigup\bin;$env:PATH"
-          zigup install master
-          zigup default master
           zigup list
           zig version
