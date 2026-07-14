@@ -34,7 +34,7 @@ IFS='
 '
 for row in $(echo "$RELEASES_JSON" | grep -E '"tag_name":|browser_download_url'); do
   if echo "$row" | grep -q '"tag_name":'; then
-    CURRENT_TAG=$(echo "$row" | sed -E 's/.*"tag_name":\s*"(.*)".*/\1/')
+    CURRENT_TAG=$(echo "$row" | sed -E 's/.*"tag_name":[[:space:]]*"([^"]*)".*/\1/')
   elif echo "$row" | grep -q "$BINARY_NAME"; then
     TAG="$CURRENT_TAG"
     break

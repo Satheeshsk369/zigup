@@ -13,8 +13,6 @@ jobs:
             name: Linux x86_64
           - os: macos-latest
             name: macOS aarch64
-          - os: macos-13
-            name: macOS x86_64
 
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -28,9 +26,7 @@ jobs:
           $HOME/.local/bin/zigup install master
           $HOME/.local/bin/zigup default master
           $HOME/.local/bin/zigup list
-          zig version
-        env:
-          PATH: ${{ env.HOME }}/.local/bin:${{ env.PATH }}
+          $HOME/.local/bin/zig version
 
   test-windows:
     name: Windows x86_64
