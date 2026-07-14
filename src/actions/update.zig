@@ -28,7 +28,7 @@ pub fn run(ctx: action.Context) !void {
 
     if (resp.status != .ok) {
         std.log.err("failed to check for updates: HTTP {s}", .{@tagName(resp.status)});
-        return;
+        return error.HttpError;
     }
 
     const GitHubRelease = struct {
@@ -73,8 +73,8 @@ pub fn run(ctx: action.Context) !void {
     }
 
     const release = target_release orelse {
-        std.log.info("A newer release tag may exist on GitHub, but no compiled binary asset found for target '{s}' on any release.", .{expected_asset_name});
-        return;
+        std.log.err("no compatible binary asset found for {s} in any release", .{expected_asset_name});
+        return error.HttpError;
     };
     var release_tag = release.tag_name;
     if (std.mem.startsWith(u8, release_tag, "v")) {
@@ -105,7 +105,7 @@ pub fn run(ctx: action.Context) !void {
     const dlResult = try dl.Downloader.downloadToFile(&downloader, url, null, null, file, ctx.io);
     if (dlResult.status != .ok) {
         std.log.err("failed to download update: HTTP {s}", .{@tagName(dlResult.status)});
-        return;
+        return error.HttpError;
     }
     const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
 
@@ -114,17 +114,17 @@ pub fn run(ctx: action.Context) !void {
         const rc = std.posix.system.fchmod(fd, 0o755);
         if (rc != 0) {
             std.log.err("failed to set executable permission: rc {d}", .{rc});
-            return;
+            return error.AccessDenied;
         }
     }
 
-    var bd = std.Io.Dir.openDirAbsolute(ctx.io, bin_dir, .{}) catch return;
+    var bd = try std.Io.Dir.openDirAbsolute(ctx.io, bin_dir, .{});
     defer bd.close(ctx.io);
 
     bd.deleteFile(ctx.io, "zigup") catch {};
     bd.rename("zigup.tmp", bd, "zigup", ctx.io) catch |err| {
         std.log.err("failed to replace zigup binary: {s}", .{@errorName(err)});
-        return;
+        return err;
     };
 
     std.log.info("Successfully updated zigup in {d:.2}s.", .{dl_secs});

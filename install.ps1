@@ -34,8 +34,15 @@ $dest      = Join-Path $binDir "zigup.exe"
 
 if (Test-Path $dest) {
     Write-Host "zigup is already installed at $dest. Running self-update"
-    & $dest update
-    exit 0
+    $oldVer = try { & $dest version } catch { "0.0.0" }
+    try {
+        & $dest update
+    } catch {}
+    $newVer = try { & $dest version } catch { "0.0.0" }
+    if ($oldVer -ne $newVer -and $newVer -ne "0.0.0") {
+        exit 0
+    }
+    Write-Host "Self-update failed. Installing directly"
 }
 
 New-Item -ItemType Directory -Path $binDir -Force | Out-Null

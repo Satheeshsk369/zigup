@@ -53,8 +53,13 @@ CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zigup"
 
 if [ -x "$BIN_DIR/zigup" ]; then
   echo "zigup is already installed at $BIN_DIR/zigup. Running self-update"
-  "$BIN_DIR/zigup" update
-  exit 0
+  OLD_VER=$("$BIN_DIR/zigup" version 2>/dev/null || echo "0.0.0")
+  "$BIN_DIR/zigup" update || true
+  NEW_VER=$("$BIN_DIR/zigup" version 2>/dev/null || echo "0.0.0")
+  if [ "$OLD_VER" != "$NEW_VER" ] && [ "$NEW_VER" != "0.0.0" ]; then
+    exit 0
+  fi
+  echo "Self-update failed. Installing directly"
 fi
 
 mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$CACHE_DIR"
