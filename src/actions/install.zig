@@ -51,7 +51,7 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     }
     var index = Schema.Index.init(ctx.gpa, ctx.io, ctx.environMap);
     defer index.deinit();
-    const schema = blk: {
+    var schema = blk: {
         if (url_opt) |u| {
             var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
             defer httpBuf.deinit();
@@ -81,6 +81,7 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
             };
         }
     };
+    defer schema.deinit();
     const platform = Schema.Platform.parse(action.targetKey()) orelse {
         std.log.err("unsupported platform: {s}", .{action.targetKey()});
         return;
