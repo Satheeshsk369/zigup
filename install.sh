@@ -35,9 +35,7 @@ IFS='
 for row in $(echo "$RELEASES_JSON" | grep -E '"tag_name":|browser_download_url'); do
   if echo "$row" | grep -q '"tag_name":'; then
     CURRENT_TAG=$(echo "$row" | sed -E 's/.*"tag_name":\s*"(.*)".*/\1/')
-  fi
-
-  if echo "$row" | grep -q "browser_download_url" && echo "$row" | grep -q "$BINARY_NAME"; then
+  elif echo "$row" | grep -q "$BINARY_NAME"; then
     TAG="$CURRENT_TAG"
     break
   fi
@@ -53,10 +51,14 @@ BIN_DIR="${XDG_DATA_HOME:-$HOME/.local}/bin"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zigup"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zigup"
 
-mkdir -p "$BIN_DIR"
-mkdir -p "$CONFIG_DIR"
-mkdir -p "$CACHE_DIR"
-echo "Downloading zigup for ${OS}-${ARCH} (tag ${TAG})..."
+if [ -x "$BIN_DIR/zigup" ]; then
+  echo "zigup is already installed at $BIN_DIR/zigup. Running self-update"
+  "$BIN_DIR/zigup" update
+  exit 0
+fi
+
+mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$CACHE_DIR"
+echo "Downloading zigup for ${OS}-${ARCH} (tag ${TAG})"
 curl -sSfL "$DOWNLOAD_URL" -o "$BIN_DIR/zigup"
 chmod +x "$BIN_DIR/zigup"
 echo "Successfully installed zigup to $BIN_DIR/zigup"

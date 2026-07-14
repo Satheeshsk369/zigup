@@ -83,16 +83,16 @@ pub const Downloader = struct {
                 last_update = now;
                 if (content_length) |total| {
                     const pct = (@as(f64, @floatFromInt(downloaded)) / @as(f64, @floatFromInt(total))) * 100.0;
-                    printProgress(io, "\rDownloading... {d:.1}% ({d} / {d} bytes)", .{ pct, downloaded, total });
+                    printProgress(io, "\rDownloading: {d:.1}% ({d} / {d} bytes)", .{ pct, downloaded, total });
                 } else {
-                    printProgress(io, "\rDownloading... {d} bytes", .{downloaded});
+                    printProgress(io, "\rDownloading: {d} bytes", .{downloaded});
                 }
             }
         }
         if (content_length) |total| {
-            printProgress(io, "\rDownloading... 100.0% ({d} / {d} bytes)\n", .{ total, total });
+            printProgress(io, "\rDownloading: 100.0% ({d} / {d} bytes)\n", .{ total, total });
         } else {
-            printProgress(io, "\rDownloading... {d} bytes\n", .{downloaded});
+            printProgress(io, "\rDownloading: {d} bytes\n", .{downloaded});
         }
 
         try writer.flush();

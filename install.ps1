@@ -32,10 +32,16 @@ $configDir = Join-Path $env:APPDATA "zigup"
 $cacheDir  = Join-Path $env:LOCALAPPDATA "zigup\cache"
 $dest      = Join-Path $binDir "zigup.exe"
 
+if (Test-Path $dest) {
+    Write-Host "zigup is already installed at $dest. Running self-update"
+    & $dest update
+    exit 0
+}
+
 New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 New-Item -ItemType Directory -Path $configDir -Force | Out-Null
 New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
-Write-Host "Downloading zigup $tag ($arch)..."
+Write-Host "Downloading zigup $tag ($arch)"
 Invoke-WebRequest -Uri $url -OutFile $dest
 
 $rawUserPath = [Environment]::GetEnvironmentVariable("Path", "User")

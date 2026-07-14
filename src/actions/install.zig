@@ -55,7 +55,7 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
         if (url_opt) |u| {
             var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
             defer httpBuf.deinit();
-            std.log.info("Fetching index from {s}...", .{u});
+            std.log.info("Fetching index from {s}", .{u});
             if ((try index.fetchUrl(u, &httpBuf)) != .ok) {
                 std.log.err("failed to fetch index", .{});
                 return error.HttpError;
@@ -70,7 +70,7 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
                 if (ctx.userConfig.getMirrorUrl(mirror_name)) |url| {
                     var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
                     defer httpBuf.deinit();
-                    std.log.warn("Cache not found for '{s}'. Fetching from {s}...", .{ mirror_name, url });
+                    std.log.warn("Cache not found for '{s}'. Fetching from {s}", .{ mirror_name, url });
                     if ((try index.fetchUrl(url, &httpBuf)) == .ok) {
                         try Schema.Type.saveCache(ctx.gpa, ctx.io, cache_path, httpBuf.written());
                         break :blk try Schema.Type.parse(ctx.gpa, httpBuf.written());

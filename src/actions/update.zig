@@ -17,7 +17,7 @@ pub fn run(ctx: action.Context) !void {
     var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
     defer httpBuf.deinit();
 
-    const uri = try std.Uri.parse("https://api.github.com/repos/Satheeshsk369/zigup/releases/latest");
+    const uri = try std.Uri.parse("https://api.github.com/repos/Satheeshsk369/zigup/releases");
     std.log.info("Checking for updates from GitHub", .{});
     const resp = try client.fetch(.{
         .location = .{ .uri = uri },
@@ -39,8 +39,8 @@ pub fn run(ctx: action.Context) !void {
         },
     };
 
-    const release_parsed = std.json.parseFromSlice(
-        GitHubRelease,
+    const releases_parsed = std.json.parseFromSlice(
+        []GitHubRelease,
         ctx.arena,
         httpBuf.written(),
         .{ .ignore_unknown_fields = true },
@@ -48,37 +48,52 @@ pub fn run(ctx: action.Context) !void {
         std.log.err("failed to parse release metadata: {s}", .{@errorName(err)});
         return;
     };
-    defer release_parsed.deinit();
+    defer releases_parsed.deinit();
 
-    const release = release_parsed.value;
+    const releases = releases_parsed.value;
+    if (releases.len == 0) {
+        std.log.info("No releases found.", .{});
+        return;
+    }
 
     const current_ver = @import("options").version;
+    var target_release: ?GitHubRelease = null;
+    var download_url: ?[]const u8 = null;
+
+    // Find the latest release that actually has the asset matching expected_asset_name
+    for (releases) |rel| {
+        for (rel.assets) |asset| {
+            if (std.mem.eql(u8, asset.name, expected_asset_name)) {
+                target_release = rel;
+                download_url = asset.browser_download_url;
+                break;
+            }
+        }
+        if (target_release != null) break;
+    }
+
+    const release = target_release orelse {
+        std.log.info("A newer release tag may exist on GitHub, but no compiled binary asset found for target '{s}' on any release.", .{expected_asset_name});
+        return;
+    };
     var release_tag = release.tag_name;
     if (std.mem.startsWith(u8, release_tag, "v")) {
         release_tag = release_tag[1..];
     }
-    if (std.mem.eql(u8, release_tag, current_ver)) {
+
+    const parsed_current = std.SemanticVersion.parse(current_ver) catch std.SemanticVersion{ .major = 0, .minor = 0, .patch = 0 };
+    const parsed_release = std.SemanticVersion.parse(release_tag) catch std.SemanticVersion{ .major = 0, .minor = 0, .patch = 0 };
+
+    if (parsed_release.order(parsed_current) == .eq) {
         std.log.info("zigup is already up to date ({s}).", .{current_ver});
         return;
     }
-
-    var download_url: ?[]const u8 = null;
-    for (release.assets) |asset| {
-        if (std.mem.eql(u8, asset.name, expected_asset_name)) {
-            download_url = asset.browser_download_url;
-            break;
-        }
-    }
-
-    const url = download_url orelse {
-        std.log.err("no compatible binary asset found for {s} in release {s}", .{ expected_asset_name, release.tag_name });
-        return;
-    };
+    const url = download_url.?;
 
     const bin_dir = try ctx.binDir();
     const temp_exe_path = try std.fs.path.join(ctx.arena, &.{ bin_dir, "zigup.tmp" });
 
-    std.log.info("Downloading new binary from {s}...", .{url});
+    std.log.info("Downloading new binary from {s}", .{url});
 
     var dl_client = std.http.Client{ .allocator = ctx.gpa, .io = ctx.io };
     defer dl_client.deinit();

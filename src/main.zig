@@ -5,7 +5,10 @@ const config = @import("config.zig");
 pub fn main(init: std.process.Init) void {
     const gpa = init.gpa;
     const arena = init.arena.allocator();
-    var args = init.minimal.args.iterate();
+    var args = init.minimal.args.iterateAllocator(arena) catch {
+        std.log.err("Failed to initialize process arguments.", .{});
+        std.process.exit(1);
+    };
 
     var sync = false;
     var list = std.ArrayList([:0]const u8).empty;
