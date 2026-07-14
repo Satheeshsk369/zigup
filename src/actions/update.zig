@@ -8,8 +8,9 @@ pub fn run(ctx: action.Context) !void {
     const expected_asset_name = try std.fmt.allocPrint(ctx.arena, "zigup-{s}{s}", .{ action.targetKey(), suffix });
 
     var client = std.http.Client{ .allocator = ctx.gpa, .io = ctx.io };
+    client.initDefaultProxies(ctx.gpa, ctx.environMap) catch {};
+    client.now = std.Io.Clock.real.now(ctx.io);
     defer client.deinit();
-
     const extra_headers = &[_]std.http.Header{
         .{ .name = "User-Agent", .value = "zigup-client" },
     };
@@ -96,6 +97,8 @@ pub fn run(ctx: action.Context) !void {
     std.log.info("Downloading new binary from {s}", .{url});
 
     var dl_client = std.http.Client{ .allocator = ctx.gpa, .io = ctx.io };
+    dl_client.initDefaultProxies(ctx.gpa, ctx.environMap) catch {};
+    dl_client.now = std.Io.Clock.real.now(ctx.io);
     defer dl_client.deinit();
     var downloader = dl.Downloader.init(&dl_client);
 
