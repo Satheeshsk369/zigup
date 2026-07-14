@@ -4,8 +4,7 @@ const action = @import("root.zig");
 
 fn syncMirror(ctx: action.Context, mirror: []const u8) !void {
     const url = ctx.userConfig.getMirrorUrl(mirror) orelse {
-        std.log.err("mirror '{s}' not defined in config.zon", .{mirror});
-        return;
+        return error.MirrorNotFound;
     };
 
     var index = Schema.Index.init(ctx.gpa, ctx.io);

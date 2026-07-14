@@ -37,19 +37,18 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
         const symlinkPath = try std.fs.path.join(ctx.arena, &.{ binDir, "zig" });
         const targetRel = try std.fmt.allocPrint(ctx.arena, "../share/zig/{s}/zig", .{ver});
 
-        var bd = std.Io.Dir.openDirAbsolute(ctx.io, binDir, .{}) catch return;
+        var bd = try std.Io.Dir.openDirAbsolute(ctx.io, binDir, .{});
         defer bd.close(ctx.io);
 
-        bd.deleteFile(ctx.io, symlinkPath) catch {};
-        bd.symLink(ctx.io, targetRel, "zig", .{}) catch |err| {
-            std.log.err("failed to create symlink: {s}", .{@errorName(err)});
-            return;
+        bd.deleteFile(ctx.io, symlinkPath) catch |err| switch (err) {
+            error.FileNotFound => {},
+            else => return err,
         };
+        try bd.symLink(ctx.io, targetRel, "zig", .{});
     }
 
     std.log.info("Set {s} as default.", .{ver});
 }
-
 test "default action fails on nonexistent version" {
     var env_map = std.process.Environ.Map.init(std.testing.allocator);
     defer env_map.deinit();

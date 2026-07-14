@@ -6,6 +6,20 @@ const config = @import("../config.zig");
 pub const Command = command.Command;
 pub const Mirror = Schema.Index.Mirror;
 
+pub const ActionError = error{
+    HomeNotFound,
+    EnvironmentVariableNotFound,
+    OutOfMemory,
+    AccessDenied,
+    FileNotFound,
+    PathAlreadyExists,
+    ZipInsufficientBuffer,
+    ZipCorrupted,
+    HttpError,
+    MirrorNotFound,
+    ConfigParseError,
+};
+
 pub const Folder = enum { config, cache, data, bin };
 
 pub fn getPlatformPath(comptime folder: Folder) []const []const u8 {
@@ -158,19 +172,55 @@ pub fn ensureDir(io: std.Io, path: []const u8) !void {
     };
 }
 
-pub fn run(cmd: Command, ctx: Context) !void {
+pub fn run(cmd: Command, ctx: Context) ActionError!void {
     switch (cmd) {
         .help => @import("help.zig").run(),
         .version => std.debug.print("{s}\n", .{@import("options").version}),
-        .env => try @import("env.zig").run(ctx),
-        .list => |mirror| try @import("list.zig").run(ctx, mirror),
-        .install => |ver| try @import("install.zig").run(ctx, ver),
-        .delete => |ver| try @import("delete.zig").run(ctx, ver),
-        .default => |ver| try @import("default.zig").run(ctx, ver),
-        .update => try @import("update.zig").run(ctx),
+        .env => @import("env.zig").run(ctx) catch |e| switch (e) {
+            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
+            error.OutOfMemory => return error.OutOfMemory,
+        },
+        .list => |mirror| @import("list.zig").run(ctx, mirror) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
+            error.AccessDenied => return error.AccessDenied,
+            error.FileNotFound => return error.FileNotFound,
+            else => return error.FileNotFound,
+        },
+        .install => |ver| @import("install.zig").run(ctx, ver) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
+            error.AccessDenied => return error.AccessDenied,
+            error.FileNotFound => return error.FileNotFound,
+            error.ZipInsufficientBuffer => return error.ZipInsufficientBuffer,
+            error.PathAlreadyExists => return error.PathAlreadyExists,
+            error.ZipBadFileOffset, error.ZipMismatchVersionNeeded, error.ZipMismatchModTime, error.ZipMismatchModDate => return error.ZipCorrupted,
+            error.MirrorNotFound => return error.MirrorNotFound,
+            else => return error.HttpError,
+        },
+        .delete => |ver| @import("delete.zig").run(ctx, ver) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
+            error.AccessDenied => return error.AccessDenied,
+            error.FileNotFound => return error.FileNotFound,
+            else => return error.FileNotFound,
+        },
+        .default => |ver| @import("default.zig").run(ctx, ver) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
+            error.AccessDenied => return error.AccessDenied,
+            error.FileNotFound => return error.FileNotFound,
+            else => return error.FileNotFound,
+        },
+        .update => @import("update.zig").run(ctx) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
+            error.AccessDenied => return error.AccessDenied,
+            error.FileNotFound => return error.FileNotFound,
+            else => return error.HttpError,
+        },
     }
 }
-
 pub fn parseCommand(args: []const []const u8) ?Command {
     if (args.len < 2) return .help;
     const cmd = args[1];

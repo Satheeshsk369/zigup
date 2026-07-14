@@ -9,16 +9,10 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     }
 
     const data_dir = try ctx.dataDir();
-    var zd = std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{}) catch |err| {
-        std.log.err("data directory not found: {s}", .{@errorName(err)});
-        return;
-    };
+    var zd = try std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{});
     defer zd.close(ctx.io);
 
-    zd.deleteTree(ctx.io, ver) catch |err| {
-        std.log.err("failed to delete version '{s}': {s}", .{ ver, @errorName(err) });
-        return;
-    };
+    try zd.deleteTree(ctx.io, ver);
 
     std.log.info("Successfully deleted {s}.", .{ver});
 }

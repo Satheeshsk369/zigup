@@ -5,8 +5,7 @@ const action = @import("root.zig");
 
 fn syncMirror(ctx: action.Context, mirror: []const u8) !void {
     const url = ctx.userConfig.getMirrorUrl(mirror) orelse {
-        std.log.err("mirror '{s}' not defined in config.zon", .{mirror});
-        return;
+        return error.MirrorNotFound;
     };
 
     var index = Schema.Index.init(ctx.gpa, ctx.io);
@@ -43,14 +42,15 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     }
 
     const mirror_name = mirror_opt orelse ctx.userConfig.defaultMirror;
+    if (ctx.userConfig.getMirrorUrl(mirror_name) == null) {
+        return error.MirrorNotFound;
+    }
 
     if (ctx.sync and url_opt == null) {
         try syncMirror(ctx, mirror_name);
     }
-
     var index = Schema.Index.init(ctx.gpa, ctx.io);
     defer index.deinit();
-
     const schema = blk: {
         if (url_opt) |u| {
             var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
@@ -58,10 +58,13 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
             std.log.info("Fetching index from {s}...", .{u});
             if ((try index.fetchUrl(u, &httpBuf)) != .ok) {
                 std.log.err("failed to fetch index", .{});
-                return;
+                return error.HttpError;
             }
             break :blk try Schema.Type.parse(ctx.gpa, httpBuf.written());
         } else {
+            if (ctx.userConfig.getMirrorUrl(mirror_name) == null) {
+                return error.MirrorNotFound;
+            }
             const cache_path = try ctx.cacheFile(mirror_name);
             break :blk Schema.Type.loadCache(ctx.gpa, ctx.io, cache_path) catch |err| {
                 if (ctx.userConfig.getMirrorUrl(mirror_name)) |url| {
@@ -74,12 +77,10 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
                     }
                 }
                 std.log.err("failed to load cached index for mirror '{s}': {s}\nUse -S flag (e.g. 'zigup -S install {s}') to sync the cache.", .{ mirror_name, @errorName(err), ver });
-                return;
+                return error.FileNotFound;
             };
         }
     };
-    defer schema.deinit();
-
     const platform = Schema.Platform.parse(action.targetKey()) orelse {
         std.log.err("unsupported platform: {s}", .{action.targetKey()});
         return;
@@ -140,21 +141,15 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     var f_buf: [65536]u8 = undefined;
     var file_reader = archive_file.reader(ctx.io, &f_buf);
     if (is_zip) {
-        action.extractZipStrip(ctx.io, dest_dir, &file_reader) catch |err| {
-            std.log.err("failed to extract zip natively: {s}", .{@errorName(err)});
-            return;
-        };
+        try action.extractZipStrip(ctx.io, dest_dir, &file_reader);
     } else {
         const decompress_buf = try ctx.gpa.alloc(u8, 65536);
         var xz_stream = try std.compress.xz.Decompress.init(&file_reader.interface, ctx.gpa, decompress_buf);
         defer xz_stream.deinit();
 
-        std.tar.extract(ctx.io, dest_dir, &xz_stream.reader, .{
+        try std.tar.extract(ctx.io, dest_dir, &xz_stream.reader, .{
             .strip_components = 1,
-        }) catch |err| {
-            std.log.err("failed to extract tarball natively: {s}", .{@errorName(err)});
-            return;
-        };
+        });
     }
 
     std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, download_path) catch {};
