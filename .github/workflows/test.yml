@@ -1,0 +1,34 @@
+name: Test & CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      zig_version:
+        description: 'Zig version to install and verify'
+        required: true
+        default: '0.16.0'
+
+jobs:
+  test:
+    name: Test zigup on Ubuntu
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install zigup and Manage Zig
+        run: |
+          # Download and install zigup using the shell script installer
+          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
+          
+          # Add the installation directory to GITHUB_PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          
+          # Initialize and default the selected Zig compiler version
+          $HOME/.local/bin/zigup install ${{ github.event.inputs.zig_version }}
+          $HOME/.local/bin/zigup default ${{ github.event.inputs.zig_version }}
+          $HOME/.local/bin/zigup list
+        shell: bash
