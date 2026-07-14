@@ -48,10 +48,11 @@ fi
 
 DOWNLOAD_URL="https://github.com/Satheeshsk369/zigup/releases/download/${TAG}/${BINARY_NAME}"
 BIN_DIR="${XDG_DATA_HOME:-$HOME/.local}/bin"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/zig"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zigup"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zigup"
 
-mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$CACHE_DIR"
+mkdir -p "$BIN_DIR" "$DATA_DIR" "$CONFIG_DIR" "$CACHE_DIR"
 echo "Downloading zigup for ${OS}-${ARCH} (tag ${TAG})"
 curl -sSfL "$DOWNLOAD_URL" -o "$BIN_DIR/zigup"
 chmod +x "$BIN_DIR/zigup"
