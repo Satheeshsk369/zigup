@@ -10,8 +10,10 @@ pub const Index = struct {
 
     const Self = @This();
 
-    pub fn init(gpa: std.mem.Allocator, io: std.Io) Self {
-        return Self{ .client = .{ .allocator = gpa, .io = io } };
+    pub fn init(gpa: std.mem.Allocator, io: std.Io, environ_map: *const std.process.Environ.Map) Self {
+        var client = Client{ .allocator = gpa, .io = io };
+        client.initDefaultProxies(gpa, environ_map) catch {};
+        return Self{ .client = client };
     }
 
     pub fn fetchUrl(self: *Self, url_str: []const u8, body: *Allocating) !std.http.Status {

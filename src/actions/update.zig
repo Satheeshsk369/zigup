@@ -100,7 +100,13 @@ pub fn run(ctx: action.Context) !void {
     var downloader = dl.Downloader.init(&dl_client);
 
     var file = try std.Io.Dir.createFileAbsolute(ctx.io, temp_exe_path, .{});
-    defer file.close(ctx.io);
+    var success = false;
+    defer {
+        file.close(ctx.io);
+        if (!success) {
+            std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, temp_exe_path) catch {};
+        }
+    }
 
     const dlResult = try dl.Downloader.downloadToFile(&downloader, url, null, null, file, ctx.io);
     if (dlResult.status != .ok) {
@@ -122,6 +128,7 @@ pub fn run(ctx: action.Context) !void {
     defer bd.close(ctx.io);
 
     bd.deleteFile(ctx.io, "zigup") catch {};
+    success = true;
     bd.rename("zigup.tmp", bd, "zigup", ctx.io) catch |err| {
         std.log.err("failed to replace zigup binary: {s}", .{@errorName(err)});
         return err;

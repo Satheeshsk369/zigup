@@ -7,7 +7,7 @@ fn syncMirror(ctx: action.Context, mirror: []const u8) !void {
         return error.MirrorNotFound;
     };
 
-    var index = Schema.Index.init(ctx.gpa, ctx.io);
+    var index = Schema.Index.init(ctx.gpa, ctx.io, ctx.environMap);
     defer index.deinit();
 
     var httpBuf = std.Io.Writer.Allocating.init(ctx.gpa);
