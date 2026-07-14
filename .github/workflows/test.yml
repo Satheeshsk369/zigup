@@ -1,34 +1,53 @@
-name: Test & CI
+name: Test Install Script
 
 on:
   workflow_dispatch:
-    inputs:
-      zig_version:
-        description: 'Zig version to install and verify'
-        required: true
-        default: '0.16.0'
 
 jobs:
-  test:
-    name: Test zigup on Ubuntu
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+  test-unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x86_64
+          - os: macos-latest
+            name: macOS aarch64
+          - os: macos-13
+            name: macOS x86_64
 
-      - name: Install zigup and Manage Zig
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Install zigup
+        run: curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
+
+      - name: Install and verify master Zig
         run: |
-          # Download and install zigup using the shell script installer
-          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
-          
-          # Add the installation directory to GITHUB_PATH
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          
-          # Initialize and default the selected Zig compiler version
-          $HOME/.local/bin/zigup install ${{ github.event.inputs.zig_version }}
-          $HOME/.local/bin/zigup default ${{ github.event.inputs.zig_version }}
+          $HOME/.local/bin/zigup install master
+          $HOME/.local/bin/zigup default master
           $HOME/.local/bin/zigup list
-        shell: bash
+          zig version
+        env:
+          PATH: ${{ env.HOME }}/.local/bin:${{ env.PATH }}
+
+  test-windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+
+    steps:
+      - name: Install zigup
+        shell: pwsh
+        run: |
+          $script = (Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1).Content
+          Invoke-Expression $script
+
+      - name: Install and verify master Zig
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:LOCALAPPDATA\zigup\bin;$env:PATH"
+          zigup install master
+          zigup default master
+          zigup list
+          zig version
