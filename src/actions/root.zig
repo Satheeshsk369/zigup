@@ -265,9 +265,14 @@ pub fn parseCommand(args: []const []const u8) ?Command {
 
 pub fn extractZipStrip(io: std.Io, dest: std.Io.Dir, fr: *std.Io.File.Reader) !void {
     var iter = try std.zip.Iterator.init(fr);
+    const total = iter.cd_record_count;
+    std.log.info("Extracting {d} entries", .{total});
     var filename_buf: [std.fs.max_path_bytes]u8 = undefined;
-
+    var extracted: u64 = 0;
     while (try iter.next()) |entry| {
+        extracted += 1;
+        if (extracted % 50 == 0 or extracted == total)
+            std.log.info("Extracting: {d}/{d}", .{ extracted, total });
         if (filename_buf.len < entry.filename_len)
             return error.ZipInsufficientBuffer;
 

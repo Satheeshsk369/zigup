@@ -142,6 +142,7 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     var f_buf: [65536]u8 = undefined;
     var file_reader = archive_file.reader(ctx.io, &f_buf);
     if (is_zip) {
+        std.log.info("Extracting archive to {s}", .{installDir});
         try action.extractZipStrip(ctx.io, dest_dir, &file_reader);
     } else {
         const decompress_buf = try ctx.gpa.alloc(u8, 65536);
