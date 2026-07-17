@@ -3,10 +3,7 @@ const action = @import("root.zig");
 
 pub fn run(ctx: action.Context, ver: []const u8) !void {
     const installDir = try ctx.versionDir(ver);
-    if (!action.dirExists(ctx, installDir)) {
-        std.log.err("{s} is not installed. Use 'zigup install {s}' first.", .{ ver, ver });
-        return;
-    }
+    if (!action.dirExists(ctx, installDir)) return error.FileNotFound;
 
     const binDir = try ctx.binDir();
     try action.ensureDir(ctx.io, binDir);
@@ -60,20 +57,25 @@ test "default action fails on nonexistent version" {
         \\    .defaultMirror = "ziglang",
         \\}
     ;
-    var parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
-    defer parsed.deinit(std.testing.allocator);
+    const parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
+    defer std.zon.parse.free(std.testing.allocator, parsed);
+    var arena_alloc = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_alloc.deinit();
+
+    var threaded = std.Io.Threaded.init(std.testing.allocator, .{});
+    defer threaded.deinit();
 
     const ctx = action.Context{
         .gpa = std.testing.allocator,
-        .arena = std.testing.allocator,
-        .io = undefined,
+        .arena = arena_alloc.allocator(),
+        .io = threaded.io(),
         .environMap = &env_map,
         .pathEnv = "/usr/bin:/bin",
-        .userConfig = parsed.value,
+        .userConfig = parsed,
         .args = &.{},
         .sync = false,
     };
 
-    // Assert that attempting to set a non-installed version as default returns cleanly with error message instead of panicking
-    try run(ctx, "0.0.0-nonexistent");
+    // Version not installed — expect FileNotFound, no panic
+    try std.testing.expectError(error.FileNotFound, run(ctx, "0.0.0-nonexistent"));
 }

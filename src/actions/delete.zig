@@ -3,10 +3,7 @@ const action = @import("root.zig");
 
 pub fn run(ctx: action.Context, ver: []const u8) !void {
     const installDir = try ctx.versionDir(ver);
-    if (!action.dirExists(ctx, installDir)) {
-        std.log.warn("version {s} is not installed", .{ver});
-        return;
-    }
+    if (!action.dirExists(ctx, installDir)) return error.FileNotFound;
 
     const data_dir = try ctx.dataDir();
     var zd = try std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{});
@@ -28,21 +25,25 @@ test "delete action directory check" {
         \\    .defaultMirror = "ziglang",
         \\}
     ;
-    var parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
-    defer parsed.deinit(std.testing.allocator);
+    const parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
+    defer std.zon.parse.free(std.testing.allocator, parsed);
+
+    var arena_alloc = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_alloc.deinit();
+
+    var threaded = std.Io.Threaded.init(std.testing.allocator, .{});
+    defer threaded.deinit();
 
     const ctx = action.Context{
         .gpa = std.testing.allocator,
-        .arena = std.testing.allocator,
-        .io = undefined,
+        .arena = arena_alloc.allocator(),
+        .io = threaded.io(),
         .environMap = &env_map,
         .pathEnv = "/usr/bin:/bin",
-        .userConfig = parsed.value,
+        .userConfig = parsed,
         .args = &.{},
         .sync = false,
     };
 
-    // Assert that attempting to delete a non-installed version handles it cleanly
-    // (it should warn and return, not crash or assert fail)
-    try run(ctx, "0.0.0-nonexistent");
+    try std.testing.expectError(error.FileNotFound, run(ctx, "0.0.0-nonexistent"));
 }

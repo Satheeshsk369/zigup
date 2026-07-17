@@ -93,3 +93,7 @@ pub fn main(init: std.process.Init) void {
         std.process.exit(1);
     };
 }
+
+test {
+    std.testing.refAllDecls(@This());
+}

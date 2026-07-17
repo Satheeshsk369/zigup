@@ -59,8 +59,7 @@ pub fn run(ctx: action.Context, mirror_arg: []const u8) !void {
         }
     } else {
         const data_dir = try ctx.dataDir();
-        var dir = std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{ .iterate = true }) catch |err| {
-            std.log.warn("No installed versions found: {s}", .{@errorName(err)});
+        var dir = std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{ .iterate = true }) catch {
             return;
         };
         defer dir.close(ctx.io);
@@ -93,16 +92,22 @@ test "list action mock execution" {
         \\    .defaultMirror = "ziglang",
         \\}
     ;
-    var parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
-    defer parsed.deinit(std.testing.allocator);
+    const parsed = try std.zon.parse.fromSliceAlloc(@import("../config.zig").Config, std.testing.allocator, config_zon, null, .{});
+    defer std.zon.parse.free(std.testing.allocator, parsed);
+
+    var arena_alloc = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_alloc.deinit();
+
+    var threaded = std.Io.Threaded.init(std.testing.allocator, .{});
+    defer threaded.deinit();
 
     const ctx = action.Context{
         .gpa = std.testing.allocator,
-        .arena = std.testing.allocator,
-        .io = undefined,
+        .arena = arena_alloc.allocator(),
+        .io = threaded.io(),
         .environMap = &env_map,
         .pathEnv = "/usr/bin:/bin",
-        .userConfig = parsed.value,
+        .userConfig = parsed,
         .args = &.{},
         .sync = false,
     };
