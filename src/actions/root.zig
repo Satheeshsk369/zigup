@@ -205,13 +205,6 @@ pub fn run(cmd: Command, ctx: Context) ActionError!void {
             error.FileNotFound => return error.FileNotFound,
             else => return error.FileNotFound,
         },
-        .default => |ver| @import("default.zig").run(ctx, ver) catch |e| switch (e) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
-            error.AccessDenied => return error.AccessDenied,
-            error.FileNotFound => return error.FileNotFound,
-            else => return error.FileNotFound,
-        },
         .update => @import("update.zig").run(ctx) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
@@ -235,14 +228,6 @@ pub fn parseCommand(args: []const []const u8) ?Command {
             return .help;
         }
         return Command{ .install = args[2] };
-    }
-
-    if (std.mem.eql(u8, cmd, "default")) {
-        if (args.len < 3) {
-            std.log.err("command 'default' requires a version tag", .{});
-            return .help;
-        }
-        return Command{ .default = args[2] };
     }
 
     if (std.mem.eql(u8, cmd, "delete")) {

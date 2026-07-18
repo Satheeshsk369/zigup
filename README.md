@@ -18,8 +18,7 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 
 ## Commands
 
-- **`install <TAG>`**: Installs a Zig version. Use `-S` to sync and select from mirrors, `--mirror=<name>` for specific mirrors, or `--url=<url>` for direct links.
-- **`default <TAG>`**: Switches the default active Zig compiler version.
+- **`install <TAG>`**: Downloads, installs, and activates a Zig version. Skips download if already installed but always updates the active symlink. Use `-S` to sync and select from mirrors, `--mirror=<name>` for specific mirrors, or `--url=<url>` for direct links.
 - **`list [MIRROR]`**: Lists locally installed versions (or cached remote versions if a mirror name is provided). Use `-S` to sync.
 - **`delete <TAG>`**: Uninstalls a local Zig version.
 - **`update`**: Updates `zigup` to the latest release binary.
@@ -41,51 +40,56 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 
 ## Usage
 
-* By default zigup uses the ziglang mirror, you can just download the tag what you want
+* By default zigup uses the ziglang mirror. Install a version and it becomes active immediately:
 
   ```bash
-  zigup install 0.16.0 # install the 0.16.0 version from ziglang
-  zigup default 0.16.0 # you need to explicitly set the default (otherwise zig binary won't exist on first run)
+  zigup install 0.16.0        # install 0.16.0 and set it as default
+  zigup install 0.16.0        # already installed — just re-activates it
   ```
 
-* you can manage the mirror and default mirror in the config.zon, which helps to use that with `--mirror` option.
+* Switch between installed versions by running `install` again:
 
   ```bash
-  zigup install 0.16.0 --mirror=mach # it shows already exist, even you installed 0.16.0 with other mirror
-  zigup delete 0.16.0 # in that case delete it
-  zigup install 0.16.0 --mirror=mach # install freshly from the new mirror, if you want so.
-  zigup default 0.16.0 # default won't affect unless you want a different tag
+  zigup install master        # switches active zig to master
+  zigup install 0.16.0        # switches back to 0.16.0
   ```
 
-* use the `--url` option, if you don't want to touch the config.zon
+* Manage mirrors in `config.zon`, then use `--mirror`:
 
   ```bash
-  zigup delete 0.16.0 # delete existed installation
+  zigup install 0.16.0 --mirror=mach   # install from mach mirror (skips if already present)
+  zigup delete 0.16.0                  # delete if you want a clean reinstall from another mirror
+  zigup install 0.16.0 --mirror=mach   # fresh install from mach
+  ```
+
+* Use `--url` to point at a custom index without touching `config.zon`:
+
+  ```bash
   zigup install 0.16.0 --url="https://pkg.hexops.org/zig/index.json"
-  zigup default 0.16.0
   ```
 
-* zigup use the cache the json index, if you are working with master always use `-S` for sync
+* `master` tracks HEAD — always sync the index before installing:
 
   ```bash
-  zigup -S install master # This will first update the json, Then download the zig version
-  zigup -S install master --mirror=mach 
+  zigup -S install master              # sync index, then download latest master
+  zigup -S install master --mirror=mach
   ```
 
-* You can list the tags
+* List versions:
 
   ```bash
-  zigup list # list the local installed tags
-  zigup list ziglang # list the tags present in ziglang mirror
-  zigup -S list mach # sync the index and list the tags present in mach mirror
+  zigup list                 # locally installed versions
+  zigup list ziglang         # remote versions from ziglang mirror cache
+  zigup -S list mach         # sync mach index and list its versions
   ```
 
-* View the env zigup uses
+* View the paths zigup uses:
+
   ```bash
-  zigup env # show what are the directly uses for what purpose
+  zigup env
   ```
 
-* Self update the zigup
+* Self-update zigup:
 
   ```bash
   zigup update

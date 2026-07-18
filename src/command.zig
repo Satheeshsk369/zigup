@@ -30,14 +30,12 @@ pub const A = enum(u2) {
 pub const C = enum(u2) {
     install,
     delete,
-    default,
     list,
 
     pub fn info(self: @This()) []const u8 {
         return switch (self) {
-            .install => "Download and install a version",
+            .install => "Download, install, and activate a version",
             .delete => "Delete an installed version",
-            .default => "Set an installed version as the active default",
             .list => "List local installs (or remote versions if mirror is specified)",
         };
     }

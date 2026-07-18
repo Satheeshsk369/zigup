@@ -23,17 +23,12 @@ pub fn run() void {
 
 test "help action properties" {
     var has_install = false;
-    var has_default = false;
     for (command.commands) |entry| {
         if (std.mem.eql(u8, entry.verb, "install")) {
             has_install = true;
             try std.testing.expect(entry.description.len > 0);
         }
-        if (std.mem.eql(u8, entry.verb, "default")) {
-            has_default = true;
-            try std.testing.expect(entry.description.len > 0);
-        }
+        try std.testing.expect(!std.mem.eql(u8, entry.verb, "default"));
     }
     try std.testing.expect(has_install);
-    try std.testing.expect(has_default);
 }

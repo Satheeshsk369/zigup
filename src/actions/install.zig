@@ -101,64 +101,96 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
 
     if (action.dirExists(ctx, installDir)) {
         std.log.info("Version {s} is already installed.", .{ver});
-        return;
-    }
-
-    var split = std.mem.splitBackwardsAny(u8, src.tarball, "/");
-    const filename = split.first();
-
-    std.log.info("Downloading {s}", .{ver});
-
-    var downloader = dl.Downloader.init(&index.client);
-    const cwd = try std.process.currentPathAlloc(ctx.io, ctx.arena);
-    const download_path = try std.fs.path.join(ctx.arena, &.{ cwd, filename });
-    var file = try std.Io.Dir.createFileAbsolute(ctx.io, download_path, .{});
-    defer file.close(ctx.io);
-
-    const dlResult = dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, src.size, file, ctx.io) catch |err| {
-        if (err == error.ShasumMismatch) {
-            std.log.err("SHA-256 shasum mismatch! The downloaded file is corrupted or tampered with.", .{});
-        } else {
-            std.log.err("failed to download tarball: {s}", .{@errorName(err)});
-        }
-        return;
-    };
-    if (dlResult.status != .ok) {
-        std.log.err("failed to download tarball. HTTP {s}", .{@tagName(dlResult.status)});
-        return;
-    }
-    const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
-
-    std.log.info("Verified SHA-256 shasum: {s}", .{src.shasum});
-    try action.ensureDir(ctx.io, installDir);
-    const is_zip = std.mem.endsWith(u8, filename, ".zip");
-
-    var archive_file = try std.Io.Dir.openFileAbsolute(ctx.io, download_path, .{});
-    defer archive_file.close(ctx.io);
-
-    var dest_dir = try std.Io.Dir.openDirAbsolute(ctx.io, installDir, .{});
-    defer dest_dir.close(ctx.io);
-
-    var f_buf: [65536]u8 = undefined;
-    var file_reader = archive_file.reader(ctx.io, &f_buf);
-    if (is_zip) {
-        std.log.info("Extracting archive to {s}", .{installDir});
-        try action.extractZipStrip(ctx.io, dest_dir, &file_reader);
     } else {
-        const decompress_buf = try ctx.gpa.alloc(u8, 65536);
-        var xz_stream = try std.compress.xz.Decompress.init(&file_reader.interface, ctx.gpa, decompress_buf);
-        defer xz_stream.deinit();
+        var split = std.mem.splitBackwardsAny(u8, src.tarball, "/");
+        const filename = split.first();
 
-        try std.tar.extract(ctx.io, dest_dir, &xz_stream.reader, .{
-            .strip_components = 1,
-        });
+        std.log.info("Downloading {s}", .{ver});
+
+        var downloader = dl.Downloader.init(&index.client);
+        const cwd = try std.process.currentPathAlloc(ctx.io, ctx.arena);
+        const download_path = try std.fs.path.join(ctx.arena, &.{ cwd, filename });
+        var file = try std.Io.Dir.createFileAbsolute(ctx.io, download_path, .{});
+        defer file.close(ctx.io);
+
+        const dlResult = dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, src.size, file, ctx.io) catch |err| {
+            if (err == error.ShasumMismatch) {
+                std.log.err("SHA-256 shasum mismatch! The downloaded file is corrupted or tampered with.", .{});
+            } else {
+                std.log.err("failed to download tarball: {s}", .{@errorName(err)});
+            }
+            return;
+        };
+        if (dlResult.status != .ok) {
+            std.log.err("failed to download tarball. HTTP {s}", .{@tagName(dlResult.status)});
+            return;
+        }
+        const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
+
+        std.log.info("Verified SHA-256 shasum: {s}", .{src.shasum});
+        try action.ensureDir(ctx.io, installDir);
+        const is_zip = std.mem.endsWith(u8, filename, ".zip");
+
+        var archive_file = try std.Io.Dir.openFileAbsolute(ctx.io, download_path, .{});
+        defer archive_file.close(ctx.io);
+
+        var dest_dir = try std.Io.Dir.openDirAbsolute(ctx.io, installDir, .{});
+        defer dest_dir.close(ctx.io);
+
+        var f_buf: [65536]u8 = undefined;
+        var file_reader = archive_file.reader(ctx.io, &f_buf);
+        if (is_zip) {
+            std.log.info("Extracting archive to {s}", .{installDir});
+            try action.extractZipStrip(ctx.io, dest_dir, &file_reader);
+        } else {
+            const decompress_buf = try ctx.gpa.alloc(u8, 65536);
+            var xz_stream = try std.compress.xz.Decompress.init(&file_reader.interface, ctx.gpa, decompress_buf);
+            defer xz_stream.deinit();
+            try std.tar.extract(ctx.io, dest_dir, &xz_stream.reader, .{
+                .strip_components = 1,
+            });
+        }
+
+        std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, download_path) catch {};
+        std.log.info("Successfully installed {s} in {d:.2}s.", .{ ver, dl_secs });
     }
 
-    std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, download_path) catch {};
-    std.log.info("Successfully installed {s} in {d:.2}s.", .{ ver, dl_secs });
+    try setDefault(ctx, ver, binDir, installDir);
+}
+
+fn setDefault(ctx: action.Context, ver: []const u8, binDir: []const u8, installDir: []const u8) !void {
+    const builtin = @import("builtin");
+    if (comptime builtin.os.tag == .windows) {
+        const src_exe = try std.fs.path.join(ctx.arena, &.{ installDir, "zig.exe" });
+        const dst_exe = try std.fs.path.join(ctx.arena, &.{ binDir, "zig.exe" });
+        var src_file = try std.Io.Dir.openFileAbsolute(ctx.io, src_exe, .{});
+        defer src_file.close(ctx.io);
+        var dst_file = try std.Io.Dir.createFileAbsolute(ctx.io, dst_exe, .{});
+        defer dst_file.close(ctx.io);
+        var f_buf: [65536]u8 = undefined;
+        var r = src_file.reader(ctx.io, &f_buf);
+        var w = dst_file.writer(ctx.io, &f_buf);
+        var chunk: [65536]u8 = undefined;
+        while (true) {
+            const n = try r.interface.readSliceShort(&chunk);
+            if (n == 0) break;
+            try w.interface.writeAll(chunk[0..n]);
+        }
+        try w.flush();
+    } else {
+        const symlinkPath = try std.fs.path.join(ctx.arena, &.{ binDir, "zig" });
+        const targetRel = try std.fmt.allocPrint(ctx.arena, "../share/zig/{s}/zig", .{ver});
+        var bd = try std.Io.Dir.openDirAbsolute(ctx.io, binDir, .{});
+        defer bd.close(ctx.io);
+        bd.deleteFile(ctx.io, symlinkPath) catch |err| switch (err) {
+            error.FileNotFound => {},
+            else => return err,
+        };
+        try bd.symLink(ctx.io, targetRel, "zig", .{});
+    }
+    std.log.info("Set {s} as default.", .{ver});
 }
 
 test "install action structures compilation check" {
-    // Assert type structure compiles
     _ = run;
 }
