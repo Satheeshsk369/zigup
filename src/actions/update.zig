@@ -9,9 +9,6 @@ pub fn run(ctx: action.Context) !void {
 
     var client = std.http.Client{ .allocator = ctx.gpa, .io = ctx.io };
     client.initDefaultProxies(ctx.gpa, ctx.environMap) catch {};
-    const now = std.Io.Clock.real.now(ctx.io);
-    client.ca_bundle.rescan(ctx.gpa, ctx.io, now) catch {};
-    client.now = now;
     defer client.deinit();
     const extra_headers = &[_]std.http.Header{
         .{ .name = "User-Agent", .value = "zigup-client" },
@@ -100,9 +97,6 @@ pub fn run(ctx: action.Context) !void {
 
     var dl_client = std.http.Client{ .allocator = ctx.gpa, .io = ctx.io };
     dl_client.initDefaultProxies(ctx.gpa, ctx.environMap) catch {};
-    const dl_now = std.Io.Clock.real.now(ctx.io);
-    dl_client.ca_bundle.rescan(ctx.gpa, ctx.io, dl_now) catch {};
-    dl_client.now = dl_now;
     defer dl_client.deinit();
     var downloader = dl.Downloader.init(&dl_client);
 
