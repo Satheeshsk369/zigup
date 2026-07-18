@@ -212,28 +212,17 @@ pub fn run(cmd: Command, ctx: Context) ActionError!void {
             error.FileNotFound => return error.FileNotFound,
             else => return error.HttpError,
         },
-        .use => @import("use.zig").run(ctx) catch |e| switch (e) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
-            error.AccessDenied => return error.AccessDenied,
-            error.FileNotFound => return error.FileNotFound,
-            error.ZipInsufficientBuffer => return error.ZipInsufficientBuffer,
-            error.PathAlreadyExists => return error.PathAlreadyExists,
-            error.ZipBadFileOffset, error.ZipMismatchVersionNeeded, error.ZipMismatchModTime, error.ZipMismatchModDate => return error.ZipCorrupted,
-            else => return error.HttpError,
-        },
     }
 }
 pub fn parseCommand(args: []const []const u8) ?Command {
     if (args.len < 2) return .help;
     const cmd = args[1];
 
-    if (std.mem.eql(u8, cmd, "help")) return .help;
-    if (std.mem.eql(u8, cmd, "version")) return .version;
-    if (std.mem.eql(u8, cmd, "env")) return .env;
+    if (std.mem.eql(u8, cmd, "help") or std.mem.eql(u8, cmd, "-h")) return .help;
+    if (std.mem.eql(u8, cmd, "version") or std.mem.eql(u8, cmd, "-v")) return .version;
+    if (std.mem.eql(u8, cmd, "env") or std.mem.eql(u8, cmd, "-e")) return .env;
     if (std.mem.eql(u8, cmd, "update")) return .update;
-    if (std.mem.eql(u8, cmd, "use")) return .use;
-    if (std.mem.eql(u8, cmd, "install")) {
+    if (std.mem.eql(u8, cmd, "install") or std.mem.eql(u8, cmd, "-i")) {
         if (args.len < 3) {
             std.log.err("command 'install' requires a version tag", .{});
             return .help;
@@ -241,7 +230,7 @@ pub fn parseCommand(args: []const []const u8) ?Command {
         return Command{ .install = args[2] };
     }
 
-    if (std.mem.eql(u8, cmd, "delete")) {
+    if (std.mem.eql(u8, cmd, "delete") or std.mem.eql(u8, cmd, "-d")) {
         if (args.len < 3) {
             std.log.err("command 'delete' requires a version tag", .{});
             return .help;
@@ -249,7 +238,7 @@ pub fn parseCommand(args: []const []const u8) ?Command {
         return Command{ .delete = args[2] };
     }
 
-    if (std.mem.eql(u8, cmd, "list")) {
+    if (std.mem.eql(u8, cmd, "list") or std.mem.eql(u8, cmd, "-l")) {
         if (args.len >= 3) {
             return Command{ .list = args[2] };
         }

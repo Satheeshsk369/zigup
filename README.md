@@ -18,12 +18,11 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 
 ## Commands
 
-- **`use`**: Reads `minimum_zig_version` from `build.zig.zon` in the current directory and installs it, trying each configured mirror in order until one succeeds. Errors if no `build.zig.zon` is present.
-- **`install <TAG>`**: Downloads, installs, and activates a Zig version. Skips download if already installed but always updates the active symlink. Use `-S` to sync and select from mirrors, `--mirror=<name>` for specific mirrors, or `--url=<url>` for direct links.
-- **`list [MIRROR]`**: Lists locally installed versions (or cached remote versions if a mirror name is provided). Use `-S` to sync.
-- **`delete <TAG>`**: Uninstalls a local Zig version.
+- **`install <TAG>`** (alias **`-i`**): Downloads, installs, and activates a Zig version. Skips download if already installed but always updates the active symlink. Use `-S` to sync and select from mirrors, `--mirror=<name>` for specific mirrors, or `--url=<url>` for direct links.
+- **`list [MIRROR]`** (alias **`-l`**): Lists locally installed versions (or cached remote versions if a mirror name is provided). Use `-S` to sync.
+- **`delete <TAG>`** (alias **`-d`**): Uninstalls a local Zig version.
 - **`update`**: Updates `zigup` to the latest release binary.
-- **`env`**: Checks if the `~/.local/bin` directory is configured in your system `PATH`.
+- **`env`** (alias **`-e`**): Checks if the `~/.local/bin` directory is configured in your system `PATH`.
 
 ## Configuration
 
@@ -40,15 +39,6 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 ```
 
 ## Usage
-
-* Install the Zig version your project needs — just run from the project root:
-
-  ```bash
-  zigup use
-  ```
-
-  Reads `minimum_zig_version` from `build.zig.zon`, tries each mirror in `config.zon` in order, and installs + activates the version. No arguments needed.
-* If all mirrors fail for a version, you see which ones were skipped and why. Add mirrors to `config.zon` to expand coverage.
 
 * By default zigup uses the ziglang mirror. Install a version and it becomes active immediately:
 

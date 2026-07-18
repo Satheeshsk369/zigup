@@ -4,11 +4,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const adt = b.dependency("adt", .{
-        .target = target,
-        .optimize = optimize,
-    });
-
     const version = blk: {
         const content = @embedFile("build.zig.zon");
         if (std.mem.indexOf(u8, content, ".version")) |idx| {
@@ -31,7 +26,6 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .strip = optimize != .Debug,
             .imports = &.{
-                .{ .name = "adt", .module = adt.module("adt") },
                 .{ .name = "options", .module = options.createModule() },
             },
         }),
@@ -43,7 +37,7 @@ pub fn build(b: *std.Build) void {
 
     run_step.dependOn(&run_cmd.step);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
+    run_cmd.addPassthruArgs();
 
     const tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -51,7 +45,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "adt", .module = adt.module("adt") },
                 .{ .name = "options", .module = options.createModule() },
             },
         }),

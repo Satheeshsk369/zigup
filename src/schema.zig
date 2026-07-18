@@ -1,5 +1,5 @@
 const std = @import("std");
-const adt = @import("adt");
+const adt = @import("adt.zig");
 
 const Client = std.http.Client;
 const Allocating = std.Io.Writer.Allocating;
@@ -113,10 +113,11 @@ pub const Type = struct {
     pub fn get(self: Type, version: []const u8, platform: Platform.Combination) ?Source {
         const detail = self.parsed.value.map.get(version) orelse return null;
         const target_name = @tagName(platform);
-        inline for (std.meta.fields(VersionDetail)) |f| {
-            if (std.mem.eql(u8, f.name, target_name)) {
-                if (f.type == ?Source) {
-                    return @field(detail, f.name);
+        const info = @typeInfo(VersionDetail).@"struct";
+        inline for (info.field_names, info.field_types) |name, T| {
+            if (std.mem.eql(u8, name, target_name)) {
+                if (T == ?Source) {
+                    return @field(detail, name);
                 }
             }
         }

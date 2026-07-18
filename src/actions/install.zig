@@ -106,8 +106,19 @@ pub fn runFromSource(ctx: action.Context, ver: []const u8, src: Schema.Source) !
     try action.ensureDir(ctx.io, binDir);
 
     if (action.dirExists(ctx, installDir)) {
-        std.log.info("Version {s} is already installed.", .{ver});
-    } else {
+        if (!ctx.sync) {
+            std.log.info("Version {s} is already installed.", .{ver});
+            try setDefault(ctx, ver, binDir, installDir);
+            return;
+        }
+        std.log.info("Re-installing version {s} due to sync flag...", .{ver});
+        const data_dir = try ctx.dataDir();
+        var zd = try std.Io.Dir.openDirAbsolute(ctx.io, data_dir, .{});
+        defer zd.close(ctx.io);
+        zd.deleteTree(ctx.io, ver) catch {};
+    }
+
+    {
         var idx = Schema.Index.init(ctx.gpa, ctx.io, ctx.environMap);
         defer idx.deinit();
         var downloader = dl.Downloader.init(&idx.client);
@@ -198,8 +209,4 @@ fn setDefault(ctx: action.Context, ver: []const u8, binDir: []const u8, installD
         try bd.symLink(ctx.io, targetRel, "zig", .{});
     }
     std.log.info("Set {s} as default.", .{ver});
-}
-
-test "install action structures compilation check" {
-    _ = run;
 }

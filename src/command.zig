@@ -1,5 +1,5 @@
 const std = @import("std");
-const adt = @import("adt");
+const adt = @import("adt.zig");
 
 pub const Set = adt.Set(null);
 
@@ -11,12 +11,11 @@ pub fn Group(comptime E: type, comptime Payload: type, comptime label: ?[]const 
     };
 }
 
-pub const A = enum(u3) {
+pub const A = enum(u2) {
     help,
     version,
     env,
     update,
-    use,
 
     pub fn info(self: @This()) []const u8 {
         return switch (self) {
@@ -24,7 +23,6 @@ pub const A = enum(u3) {
             .version => "Print zigup tool version",
             .env => "Print configuration and environment paths",
             .update => "Update zigup to the latest release version",
-            .use => "Install the Zig version required by the current project's build.zig.zon",
         };
     }
 };
@@ -52,19 +50,19 @@ pub const Entry = struct { verb: []const u8, argLabel: ?[]const u8, description:
 
 fn appendEntries(comptime G: type, comptime out: []Entry, comptime start: usize) usize {
     var i = start;
-    for (@typeInfo(G.Type).@"enum".fields) |f| {
-        const v: G.Type = @enumFromInt(f.value);
-        const label = if (std.mem.eql(u8, f.name, "list")) "<MIRROR>" else G.argLabel;
-        const verb = f.name;
-        out[i] = .{ .verb = verb, .argLabel = label, .description = v.info() };
+    const info = @typeInfo(G.Type).@"enum";
+    for (info.field_names, info.field_values) |name, val| {
+        const v: G.Type = @enumFromInt(val);
+        const label = if (std.mem.eql(u8, name, "list")) "<MIRROR>" else G.argLabel;
+        out[i] = .{ .verb = name, .argLabel = label, .description = v.info() };
         i += 1;
     }
     return i;
 }
 
 pub const commands: []const Entry = blk: {
-    const n = @typeInfo(A).@"enum".fields.len +
-        @typeInfo(C).@"enum".fields.len;
+    const n = @typeInfo(A).@"enum".field_names.len +
+        @typeInfo(C).@"enum".field_names.len;
     var out: [n]Entry = undefined;
     var i: usize = 0;
     i = appendEntries(GroupA, &out, i);

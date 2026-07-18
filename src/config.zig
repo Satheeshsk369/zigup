@@ -41,7 +41,7 @@ pub const Config = struct {
                 try writer.interface.writeAll(default_zon);
 
                 // For the default case, parse default_zon
-                const default_zon_z = try gpa.dupeZ(u8, default_zon);
+                const default_zon_z = try gpa.dupeSentinel(u8, default_zon, 0);
                 defer gpa.free(default_zon_z);
                 return try std.zon.parse.fromSliceAlloc(Config, gpa, default_zon_z, null, .{});
             },
@@ -55,7 +55,7 @@ pub const Config = struct {
         const content = try r.interface.readAlloc(gpa, @intCast(stat.size));
         defer gpa.free(content);
 
-        const content_z = try gpa.dupeZ(u8, content);
+        const content_z = try gpa.dupeSentinel(u8, content, 0);
         defer gpa.free(content_z);
 
         var diag = std.zon.parse.Diagnostics{};

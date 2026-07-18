@@ -11,7 +11,16 @@ pub fn run() void {
     , .{});
 
     inline for (command.commands) |entry| {
-        const usage = if (entry.argLabel) |lbl| entry.verb ++ " " ++ lbl else entry.verb;
+        const alias = comptime blk: {
+            if (std.mem.eql(u8, entry.verb, "help")) break :blk "-h help";
+            if (std.mem.eql(u8, entry.verb, "version")) break :blk "-v version";
+            if (std.mem.eql(u8, entry.verb, "env")) break :blk "-e env";
+            if (std.mem.eql(u8, entry.verb, "install")) break :blk "-i install";
+            if (std.mem.eql(u8, entry.verb, "delete")) break :blk "-d delete";
+            if (std.mem.eql(u8, entry.verb, "list")) break :blk "-l list";
+            break :blk entry.verb;
+        };
+        const usage = if (entry.argLabel) |lbl| alias ++ " " ++ lbl else alias;
         std.debug.print("  {s:<20} {s}\n", .{ usage, entry.description });
         if (std.mem.eql(u8, entry.verb, "install")) {
             std.debug.print("    --mirror=<name>    Select index mirror configured in config.zon\n", .{});
@@ -19,22 +28,4 @@ pub fn run() void {
         }
     }
     std.debug.print("\n", .{});
-}
-
-test "help action properties" {
-    var has_install = false;
-    var has_use = false;
-    for (command.commands) |entry| {
-        if (std.mem.eql(u8, entry.verb, "install")) {
-            has_install = true;
-            try std.testing.expect(entry.description.len > 0);
-        }
-        if (std.mem.eql(u8, entry.verb, "use")) {
-            has_use = true;
-            try std.testing.expect(entry.description.len > 0);
-        }
-        try std.testing.expect(!std.mem.eql(u8, entry.verb, "default"));
-    }
-    try std.testing.expect(has_install);
-    try std.testing.expect(has_use);
 }

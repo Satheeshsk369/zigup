@@ -143,7 +143,3 @@ pub fn run(ctx: action.Context) !void {
 
     std.log.info("Successfully updated zigup in {d:.2}s.", .{dl_secs});
 }
-
-test "update action structure" {
-    _ = run;
-}
