@@ -11,11 +11,12 @@ pub fn Group(comptime E: type, comptime Payload: type, comptime label: ?[]const 
     };
 }
 
-pub const A = enum(u2) {
+pub const A = enum(u3) {
     help,
     version,
     env,
     update,
+    use,
 
     pub fn info(self: @This()) []const u8 {
         return switch (self) {
@@ -23,6 +24,7 @@ pub const A = enum(u2) {
             .version => "Print zigup tool version",
             .env => "Print configuration and environment paths",
             .update => "Update zigup to the latest release version",
+            .use => "Install the Zig version required by the current project's build.zig.zon",
         };
     }
 };
@@ -53,7 +55,8 @@ fn appendEntries(comptime G: type, comptime out: []Entry, comptime start: usize)
     for (@typeInfo(G.Type).@"enum".fields) |f| {
         const v: G.Type = @enumFromInt(f.value);
         const label = if (std.mem.eql(u8, f.name, "list")) "<MIRROR>" else G.argLabel;
-        out[i] = .{ .verb = f.name, .argLabel = label, .description = v.info() };
+        const verb = f.name;
+        out[i] = .{ .verb = verb, .argLabel = label, .description = v.info() };
         i += 1;
     }
     return i;

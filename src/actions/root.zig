@@ -212,6 +212,16 @@ pub fn run(cmd: Command, ctx: Context) ActionError!void {
             error.FileNotFound => return error.FileNotFound,
             else => return error.HttpError,
         },
+        .use => @import("use.zig").run(ctx) catch |e| switch (e) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.HomeNotFound, error.EnvironmentVariableNotFound => return error.EnvironmentVariableNotFound,
+            error.AccessDenied => return error.AccessDenied,
+            error.FileNotFound => return error.FileNotFound,
+            error.ZipInsufficientBuffer => return error.ZipInsufficientBuffer,
+            error.PathAlreadyExists => return error.PathAlreadyExists,
+            error.ZipBadFileOffset, error.ZipMismatchVersionNeeded, error.ZipMismatchModTime, error.ZipMismatchModDate => return error.ZipCorrupted,
+            else => return error.HttpError,
+        },
     }
 }
 pub fn parseCommand(args: []const []const u8) ?Command {
@@ -222,6 +232,7 @@ pub fn parseCommand(args: []const []const u8) ?Command {
     if (std.mem.eql(u8, cmd, "version")) return .version;
     if (std.mem.eql(u8, cmd, "env")) return .env;
     if (std.mem.eql(u8, cmd, "update")) return .update;
+    if (std.mem.eql(u8, cmd, "use")) return .use;
     if (std.mem.eql(u8, cmd, "install")) {
         if (args.len < 3) {
             std.log.err("command 'install' requires a version tag", .{});

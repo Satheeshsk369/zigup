@@ -92,6 +92,12 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
         return;
     };
 
+    try runFromSource(ctx, ver, src);
+}
+
+/// Download (if needed), extract, and activate a specific source entry.
+/// Called by both `install` and `use`.
+pub fn runFromSource(ctx: action.Context, ver: []const u8, src: Schema.Source) !void {
     const dataDir = try ctx.dataDir();
     const binDir = try ctx.binDir();
     const installDir = try ctx.versionDir(ver);
@@ -102,12 +108,15 @@ pub fn run(ctx: action.Context, ver: []const u8) !void {
     if (action.dirExists(ctx, installDir)) {
         std.log.info("Version {s} is already installed.", .{ver});
     } else {
+        var idx = Schema.Index.init(ctx.gpa, ctx.io, ctx.environMap);
+        defer idx.deinit();
+        var downloader = dl.Downloader.init(&idx.client);
+
         var split = std.mem.splitBackwardsAny(u8, src.tarball, "/");
         const filename = split.first();
 
         std.log.info("Downloading {s}", .{ver});
 
-        var downloader = dl.Downloader.init(&index.client);
         const cwd = try std.process.currentPathAlloc(ctx.io, ctx.arena);
         const download_path = try std.fs.path.join(ctx.arena, &.{ cwd, filename });
         var file = try std.Io.Dir.createFileAbsolute(ctx.io, download_path, .{});
