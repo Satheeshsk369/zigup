@@ -20,15 +20,11 @@ jobs:
     steps:
       - name: Install zigup
         run: |
-          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.sh | sh
+          curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/${{ github.ref_name }}/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install master Zig
         run: zigup install master
-
-      - name: Set master as default
-        run: zigup default master
-
       - name: Verify
         run: |
           zigup list
@@ -42,7 +38,7 @@ jobs:
       - name: Install zigup
         shell: pwsh
         run: |
-          $script = (Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/Satheeshsk369/zigup/main/install.ps1).Content
+          $script = (Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/Satheeshsk369/zigup/${{ github.ref_name }}/install.ps1).Content
           Invoke-Expression $script
           "$env:LOCALAPPDATA\zigup\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
@@ -53,11 +49,6 @@ jobs:
       - name: Install master Zig
         shell: pwsh
         run: zigup install master
-
-      - name: Set master as default
-        shell: pwsh
-        run: zigup default master
-
       - name: Verify
         shell: pwsh
         run: |
