@@ -86,6 +86,13 @@ pub fn main(init: std.process.Init) void {
             error.MirrorNotFound => {
                 std.log.err("The requested mirror is not defined in config.zon.", .{});
             },
+            error.SignatureVerificationFailed,
+            error.MinisignFilenameMismatch,
+            error.InvalidMinisignFormat,
+            error.UnsupportedMinisignAlgorithm,
+            => {
+                std.log.err("Signature verification failed: {s}.", .{@errorName(err)});
+            },
             else => {
                 std.log.err("Command failed with error: {s}.", .{@errorName(err)});
             },

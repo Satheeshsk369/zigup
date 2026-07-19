@@ -43,9 +43,7 @@ pub const C = enum(u2) {
 
 pub const GroupA = Group(A, void, null);
 pub const GroupC = Group(C, []const u8, "<TAG>");
-
 pub const Command = Set.join(GroupA.Union, GroupC.Union);
-
 pub const Entry = struct { verb: []const u8, argLabel: ?[]const u8, description: []const u8 };
 
 fn appendEntries(comptime G: type, comptime out: []Entry, comptime start: usize) usize {

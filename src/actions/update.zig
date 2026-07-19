@@ -109,7 +109,7 @@ pub fn run(ctx: action.Context) !void {
         }
     }
 
-    const dlResult = try dl.Downloader.downloadToFile(&downloader, url, null, null, file, ctx.io);
+    const dlResult = try dl.Downloader.downloadToFile(&downloader, url, null, file, ctx.io);
     if (dlResult.status != .ok) {
         std.log.err("failed to download update: HTTP {s}", .{@tagName(dlResult.status)});
         return error.HttpError;

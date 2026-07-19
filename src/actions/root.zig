@@ -18,6 +18,11 @@ pub const ActionError = error{
     HttpError,
     MirrorNotFound,
     ConfigParseError,
+    SignatureVerificationFailed,
+    MinisignFilenameMismatch,
+    InvalidMinisignFormat,
+    UnsupportedMinisignAlgorithm,
+    InvalidPublicKey,
 };
 
 pub const Folder = enum { config, cache, data, bin };

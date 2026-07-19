@@ -2,6 +2,9 @@ const std = @import("std");
 const Schema = @import("../schema.zig");
 const dl = @import("../download.zig");
 const action = @import("root.zig");
+const minisign = @import("../minisign.zig");
+
+const zig_pubkey = "RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U";
 
 fn syncMirror(ctx: action.Context, mirror: []const u8) !void {
     const url = ctx.userConfig.getMirrorUrl(mirror) orelse {
@@ -128,17 +131,21 @@ pub fn runFromSource(ctx: action.Context, ver: []const u8, src: Schema.Source) !
 
         std.log.info("Downloading {s}", .{ver});
 
+        const minisig_url = try std.fmt.allocPrint(ctx.arena, "{s}.minisig", .{src.tarball});
+        var minisig_buf = std.Io.Writer.Allocating.init(ctx.gpa);
+        defer minisig_buf.deinit();
+        if ((try idx.fetchUrl(minisig_url, &minisig_buf)) != .ok) {
+            std.log.err("failed to fetch .minisig for {s}", .{filename});
+            return;
+        }
+
         const cwd = try std.process.currentPathAlloc(ctx.io, ctx.arena);
         const download_path = try std.fs.path.join(ctx.arena, &.{ cwd, filename });
         var file = try std.Io.Dir.createFileAbsolute(ctx.io, download_path, .{});
         defer file.close(ctx.io);
 
-        const dlResult = dl.Downloader.downloadToFile(&downloader, src.tarball, src.shasum, src.size, file, ctx.io) catch |err| {
-            if (err == error.ShasumMismatch) {
-                std.log.err("SHA-256 shasum mismatch! The downloaded file is corrupted or tampered with.", .{});
-            } else {
-                std.log.err("failed to download tarball: {s}", .{@errorName(err)});
-            }
+        const dlResult = dl.Downloader.downloadToFile(&downloader, src.tarball, src.size, file, ctx.io) catch |err| {
+            std.log.err("failed to download tarball: {s}", .{@errorName(err)});
             return;
         };
         if (dlResult.status != .ok) {
@@ -147,7 +154,12 @@ pub fn runFromSource(ctx: action.Context, ver: []const u8, src: Schema.Source) !
         }
         const dl_secs = @as(f64, @floatFromInt(dlResult.duration)) / 1_000_000_000.0;
 
-        std.log.info("Verified SHA-256 shasum: {s}", .{src.shasum});
+        minisign.verifyMinisign(minisig_buf.written(), &dlResult.digest, filename, zig_pubkey) catch |err| {
+            std.log.err("Minisign verification failed: {s}", .{@errorName(err)});
+            std.Io.Dir.deleteFile(std.Io.Dir.cwd(), ctx.io, download_path) catch {};
+            return;
+        };
+        std.log.info("Minisign OK.", .{});
         try action.ensureDir(ctx.io, installDir);
         const is_zip = std.mem.endsWith(u8, filename, ".zip");
 
