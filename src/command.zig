@@ -27,16 +27,18 @@ pub const A = enum(u2) {
     }
 };
 
-pub const C = enum(u2) {
+pub const C = enum(u3) {
     install,
     delete,
     list,
+    set,
 
     pub fn info(self: @This()) []const u8 {
         return switch (self) {
-            .install => "Download, install, and activate a version",
+            .install => "Download and install a version",
             .delete => "Delete an installed version",
             .list => "List local installs (or remote versions if mirror is specified)",
+            .set => "Set an installed version as the default",
         };
     }
 };

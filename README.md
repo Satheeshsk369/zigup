@@ -18,11 +18,14 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 
 ## Commands
 
-- **`install <TAG>`** (alias **`-i`**): Downloads, installs, and activates a Zig version. Skips download if already installed but always updates the active symlink. Use `-S` to sync and select from mirrors, `--mirror=<name>` for specific mirrors, or `--url=<url>` for direct links.
-- **`list [MIRROR]`** (alias **`-l`**): Lists locally installed versions (or cached remote versions if a mirror name is provided). Use `-S` to sync.
-- **`delete <TAG>`** (alias **`-d`**): Uninstalls a local Zig version.
-- **`update`**: Updates `zigup` to the latest release binary.
-- **`env`** (alias **`-e`**): Checks if the `~/.local/bin` directory is configured in your system `PATH`.
+* **`install <TAG>`** (alias **`i`**): Downloads and installs a Zig version. Skips download if already installed. Use `-S` to sync and select from mirrors, `-mirror=<name>` for specific mirrors, or `-url=<url>` for direct links.
+* **`set <TAG>`** (alias **`s`**): Sets an installed Zig version as the default/active version.
+* **`list [MIRROR]`** (alias **`l`**): Lists locally installed versions (or cached remote versions if a mirror name is provided). Use `-S` to sync.
+* **`delete <TAG>`** (alias **`d`**): Uninstalls a local Zig version.
+* **`update`** (alias **`up`**): Updates `zigup` to the latest release binary.
+* **`env`** (alias **`e`**): Checks if the `~/.local/bin` directory is configured in your system `PATH`.
+* **`help`** (alias **`h`**): Prints the help message.
+* **`version`** (alias **`v`**): Prints the zigup tool version.
 
 ## Configuration
 
@@ -40,39 +43,44 @@ powershell -NoProfile -Command "Invoke-Expression (Invoke-RestMethod 'https://ra
 
 ## Usage
 
-* By default zigup uses the ziglang mirror. Install a version and it becomes active immediately:
+* Install a version (this only downloads/extracts it):
 
   ```bash
-  zigup install 0.16.0        # install 0.16.0 and set it as default
-  zigup install 0.16.0        # already installed — just re-activates it
+  zigup install 0.16.0        # downloads and installs 0.16.0
   ```
 
-* Switch between installed versions by running `install` again:
+* Set an installed version as your active default:
 
   ```bash
-  zigup install master        # switches active zig to master
-  zigup install 0.16.0        # switches back to 0.16.0
+  zigup set 0.16.0            # sets 0.16.0 as active default
   ```
 
-* Manage mirrors in `config.zon`, then use `--mirror`:
+* Switch between installed versions by running `set`:
 
   ```bash
-  zigup install 0.16.0 --mirror=mach   # install from mach mirror (skips if already present)
+  zigup set master            # switches active zig to master (if already installed)
+  zigup set 0.16.0            # switches back to 0.16.0
+  ```
+
+* Manage mirrors in `config.zon`, then use `-mirror`:
+
+  ```bash
+  zigup install 0.16.0 -mirror=mach   # install from mach mirror (skips if already present)
   zigup delete 0.16.0                  # delete if you want a clean reinstall from another mirror
-  zigup install 0.16.0 --mirror=mach   # fresh install from mach
+  zigup install 0.16.0 -mirror=mach   # fresh install from mach
   ```
 
-* Use `--url` to point at a custom index without touching `config.zon`:
+* Use `-url` to point at a custom index without touching `config.zon`:
 
   ```bash
-  zigup install 0.16.0 --url="https://pkg.hexops.org/zig/index.json"
+  zigup install 0.16.0 -url="https://pkg.hexops.org/zig/index.json"
   ```
 
 * `master` tracks HEAD — always sync the index before installing:
 
   ```bash
   zigup -S install master              # sync index, then download latest master
-  zigup -S install master --mirror=mach
+  zigup -S install master -mirror=mach
   ```
 
 * List versions:
