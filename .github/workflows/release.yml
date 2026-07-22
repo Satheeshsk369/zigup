@@ -26,6 +26,7 @@ jobs:
       - name: Install Zig via zigup
         run: |
           $HOME/.local/bin/zigup install master
+          $HOME/.local/bin/zigup set master
           echo "$HOME/.local/bin" >> $GITHUB_PATH
         shell: bash
 
