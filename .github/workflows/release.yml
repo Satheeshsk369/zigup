@@ -20,14 +20,26 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install zigup
-        run: curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/${{ github.ref_name }}/install.sh | sh
+      - name: Cache Zig & zigup downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/zig
+            ~/.cache/zigup
+            ~/.local/bin
+          key: ${{ runner.os }}-zig-${{ hashFiles('**/build.zig.zon') }}
+          restore-keys: |
+            ${{ runner.os }}-zig-
 
-      - name: Install Zig via zigup
+      - name: Install zigup & Zig
         run: |
-          $HOME/.local/bin/zigup install master
-          $HOME/.local/bin/zigup set master
+          mkdir -p $HOME/.local/bin
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+          if [ ! -f "$HOME/.local/bin/zig" ]; then
+            curl -sSfL https://raw.githubusercontent.com/Satheeshsk369/zigup/${{ github.ref_name }}/install.sh | sh
+            $HOME/.local/bin/zigup install master
+            $HOME/.local/bin/zigup set master
+          fi
         shell: bash
 
       - name: Cross-Compile Binaries
